@@ -1,0 +1,28 @@
+{
+  "globals": {
+    "steps": 10000,
+    "output": "csv",
+    "options": {
+      "delimiter": ";",
+      "format": "en-EN"
+    }
+  },
+  "layers": [
+    {
+      "name": "MyGridLayer",
+      "file": "Resources/grid.csv",
+      "mapping": [
+        {
+          "parameter": "VisualizationTimeout",
+          "value": 180
+        }
+      ]
+    }
+  ],
+  "agents": [
+    {
+      "name": "frogAgent",
+      "count": 1
+    }
+  ]
+}
