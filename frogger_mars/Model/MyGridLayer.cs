@@ -163,6 +163,11 @@ namespace frogger_mars.Model
                 _dataVisualizationServer.WaitForStart();
                 Console.WriteLine("[Viz] START received, beginning simulation.");
             }
+            // 2) Pro Tick ggf. auf Resume warten
+            if (_dataVisualizationServer.Paused)
+                Console.WriteLine("[Viz] Simulation paused — waiting for RESUME…");
+
+            _dataVisualizationServer.WaitWhilePaused();
            
         }
 

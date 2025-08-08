@@ -23,13 +23,19 @@ public class DataVisualizationServer
     private int _lastInputTick = -1;
     private readonly ManualResetEventSlim _startGate = new(false);
     public bool Started => _startGate.IsSet;
-
-
     public void WaitForStart(CancellationToken? token = null)
     {
-        if (Started) return;
-        _startGate.Wait(token ?? CancellationToken.None);
+        if (!Started) _startGate.Wait(token ?? CancellationToken.None);
     }
+
+    // NEW: Pause/Resume
+    private readonly ManualResetEventSlim _pauseGate = new(true); // true = nicht pausiert
+    public bool Paused => !_pauseGate.IsSet;
+    public void WaitWhilePaused() => _pauseGate.Wait(); // blockt, wenn pausiert
+    private void Pause()  => _pauseGate.Reset();
+    private void Resume() => _pauseGate.Set();
+
+    
 
 
     public void Start()
@@ -72,11 +78,23 @@ public class DataVisualizationServer
                         if (t == "control" && json.TryGetValue("cmd", out var cmdEl))
                         {
                             var cmd = cmdEl.GetString();
-                            if (cmd == "start")
+                            switch (cmd)
                             {
-                                _startGate.Set();
-                                _client?.Send("{\"ack\":\"started\"}");
-                                return;
+                                case "start":
+                                    _startGate.Set();
+                                    Console.WriteLine("[Viz] START received");
+                                    _client?.Send("{\"ack\":\"started\"}");
+                                    return;
+                                case "pause":
+                                    Pause();
+                                    Console.WriteLine("[Viz] PAUSE received");
+                                    _client?.Send("{\"ack\":\"paused\"}");
+                                    return;
+                                case "resume":
+                                    Resume();
+                                    Console.WriteLine("[Viz] RESUME received");
+                                    _client?.Send("{\"ack\":\"resumed\"}");
+                                    return;
                             }
                         }
 
