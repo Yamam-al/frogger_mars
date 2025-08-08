@@ -21,9 +21,7 @@ public class DataVisualizationServer
     private int _lastInputTick = -1;
 
 
-    public DataVisualizationServer()
-    {
-    }
+
 
     public void Start()
     {
@@ -71,10 +69,10 @@ public class DataVisualizationServer
 
                         switch (direction)
                         {
-                            case "up": Frog.Position.Y -= 1; break;
-                            case "down": Frog.Position.Y += 1; break;
-                            case "left": Frog.Position.X -= 1; break;
-                            case "right": Frog.Position.X += 1; break;
+                            case "up":    Frog.InputQueue.Enqueue(FrogInput.Up);    break;
+                            case "down":  Frog.InputQueue.Enqueue(FrogInput.Down);  break;
+                            case "left":  Frog.InputQueue.Enqueue(FrogInput.Left);  break;
+                            case "right": Frog.InputQueue.Enqueue(FrogInput.Right); break;
                         }
                     }
                 }
