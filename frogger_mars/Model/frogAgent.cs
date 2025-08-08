@@ -10,7 +10,7 @@ namespace frogger_mars.Model
     ///  A simple agent stub that has an Init() method for initialization and a
     ///  Tick() method for acting in every tick of the simulation.
     /// </summary>
-    public class frogAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
+    public class FrogAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
     {
        
         // Enqueued by the WebSocket thread, consumed in Tick()
@@ -20,12 +20,12 @@ namespace frogger_mars.Model
         public void Init(MyGridLayer layer)
         {
             Layer = layer; // store layer for access within agent class
+            Breed = "frog";
         }
         
         // The Tick() method is called by the agent manager in every tick of the simulation.
         public void Tick()
         {
-            Console.WriteLine("Tick: " + Layer.GetCurrentTick()); // print the current tick
             Console.WriteLine("Frog " + this.ID + " says: Hello, World");
             while (InputQueue.TryDequeue(out var input))
             {
@@ -48,7 +48,6 @@ namespace frogger_mars.Model
         }
 
         // The layer property is used to access the main layer of this agent.
-        private MyGridLayer Layer { get; set; } // provides access to the main layer of this agent
         public Guid ID { get; set; } // the unique identifier of this agent
         
     }

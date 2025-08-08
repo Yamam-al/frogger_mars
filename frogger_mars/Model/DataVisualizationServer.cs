@@ -17,10 +17,19 @@ public class DataVisualizationServer
     private static CancellationTokenSource _cts;
     private static Task _serverTask;
     private static string _lastMessage = string.Empty;
-    public frogAgent Frog { set; get; }
+    public FrogAgent Frog { set; get; }
+    public List<CarAgent> Cars { set; get; }
+    public List<TruckAgent> Trucks { set; get; }
     private int _lastInputTick = -1;
+    private readonly ManualResetEventSlim _startGate = new(false);
+    public bool Started => _startGate.IsSet;
 
 
+    public void WaitForStart(CancellationToken? token = null)
+    {
+        if (Started) return;
+        _startGate.Wait(token ?? CancellationToken.None);
+    }
 
 
     public void Start()
@@ -53,169 +62,175 @@ public class DataVisualizationServer
                         return;
                     }
 
-                    // 2) JSON object (input)
+                    // 2) JSON object (input/control)
                     var json = JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(s);
 
-                    if (json.TryGetValue("type", out var typeEl) && typeEl.GetString() == "input")
+                    if (json.TryGetValue("type", out var typeEl))
                     {
-                        var agentId = json["agent_id"].GetInt32();
-                        var direction = json["direction"].GetString();
+                        var t = typeEl.GetString();
 
-                        // one-input-per-tick guard (optional)
-                        if (_lastInputTick == CurrentTick) return;
-                        _lastInputTick = CurrentTick;
-
-                        Console.WriteLine($"📥 Input received: Agent {agentId}, Direction: {direction}");
-
-                        switch (direction)
+                        if (t == "control" && json.TryGetValue("cmd", out var cmdEl))
                         {
-                            case "up":    Frog.InputQueue.Enqueue(FrogInput.Up);    break;
-                            case "down":  Frog.InputQueue.Enqueue(FrogInput.Down);  break;
-                            case "left":  Frog.InputQueue.Enqueue(FrogInput.Left);  break;
-                            case "right": Frog.InputQueue.Enqueue(FrogInput.Right); break;
+                            var cmd = cmdEl.GetString();
+                            if (cmd == "start")
+                            {
+                                _startGate.Set();
+                                _client?.Send("{\"ack\":\"started\"}");
+                                return;
+                            }
+                        }
+
+                        if (t == "input")
+                        {
+                            var direction = json["direction"].GetString();
+
+                            // one-input-per-tick guard (optional)
+                            if (_lastInputTick == CurrentTick) return;
+                            _lastInputTick = CurrentTick;
+
+                            Console.WriteLine($"📥 Input received: Direction: {direction}");
+
+                            switch (direction)
+                            {
+                                case "up": Frog.InputQueue.Enqueue(FrogInput.Up); break;
+                                case "down": Frog.InputQueue.Enqueue(FrogInput.Down); break;
+                                case "left": Frog.InputQueue.Enqueue(FrogInput.Left); break;
+                                case "right": Frog.InputQueue.Enqueue(FrogInput.Right); break;
+                            }
                         }
                     }
+
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine("❌ Error parsing WebSocket message: " + ex.Message);
                 }
-            };
 
-            bool TryParseTick(string s, out int tick)
-            {
-                tick = default;
+                ;
 
-                // bare int
-                if (int.TryParse(s, out tick)) return true;
-
-                // bare float, z.B. 2.0
-                if (double.TryParse(s, System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out var dbl))
+                bool TryParseTick(string s, out int tick)
                 {
-                    tick = (int)dbl;
-                    return true;
-                }
+                    tick = default;
 
-                // quoted int oder float
-                if (s?.Length >= 2 && s[0] == '"' && s[^1] == '"')
-                {
-                    var inner = s.Substring(1, s.Length - 2);
-                    if (int.TryParse(inner, out tick)) return true;
-                    if (double.TryParse(inner, System.Globalization.NumberStyles.Float,
-                            System.Globalization.CultureInfo.InvariantCulture, out dbl))
+                    // bare int
+                    if (int.TryParse(s, out tick)) return true;
+
+                    // bare float, z.B. 2.0
+                    if (double.TryParse(s, System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out var dbl))
                     {
                         tick = (int)dbl;
                         return true;
                     }
+
+                    // quoted int oder float
+                    if (s?.Length >= 2 && s[0] == '"' && s[^1] == '"')
+                    {
+                        var inner = s.Substring(1, s.Length - 2);
+                        if (int.TryParse(inner, out tick)) return true;
+                        if (double.TryParse(inner, System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out dbl))
+                        {
+                            tick = (int)dbl;
+                            return true;
+                        }
+                    }
+
+                    return false;
                 }
 
-                return false;
-            }
 
-
-            socket.OnClose = () => { _client = null; };
+                socket.OnClose = () => { _client = null; };
+            };
         });
 
-        while (!token.IsCancellationRequested)
-        {
-            Thread.Sleep(100);
-        }
-    }
-
-    public void RunInBackground()
-    {
-        _serverTask = Task.Run(() => Start());
-    }
-
-    public void Stop()
-    {
-        if (_cts == null)
-            return;
-
-        if (_client != null && _client.IsAvailable)
-        {
-            _client.Send("close");
-            Thread.Sleep(100);
-        }
-
-        _cts.Cancel();
-        _serverTask?.Wait();
-        _server?.Dispose();
-
-        _cts.Dispose();
-        _cts = null;
-        _serverTask = null;
-        _server = null;
-        _client = null;
-    }
-
-    public void SendData()
-    {
-        // Build a tiny payload with only the next tick number
-        //TODO: send actual data to client
-        var payload = new
-        {
-            expectingTick = CurrentTick + 1,
-            agents = new object[]
+            while (!token.IsCancellationRequested)
             {
-                new
-                {
-                    id = Frog.AgentId,
-                    breed = "frog",
-                    x = Frog.Position.X,
-                    y = Frog.Position.Y,
-                    heading = 0
-                },
-                new
-                {
-                    id = 2,
-                    breed = "car",
-                    x = 1,
-                    y = 14,
-                    heading = 90
-                },
-                new
-                {
-                    id = 3,
-                    breed = "car",
-                    x = 2,
-                    y = 13,
-                    heading = -90
-                },
-                new
-                {
-                    id = 5,
-                    breed = "car",
-                    x = 1,
-                    y = 12,
-                    heading = 90
-                },
-                new
-                {
-                    id = 6,
-                    breed = "car",
-                    x = 1,
-                    y = 11,
-                    heading = 90
-                },
-                new
-                {
-                    id = 7,
-                    breed = "car",
-                    x = 1,
-                    y = 10,
-                    heading = 90
-                },
+                Thread.Sleep(100);
             }
-        };
-        _lastMessage = JsonSerializer.Serialize(payload);
-        _client?.Send(_lastMessage);
-    }
+        }
+
+        public void RunInBackground()
+        {
+            _serverTask = Task.Run(() => Start());
+        }
+
+        public void Stop()
+        {
+            if (_cts == null)
+                return;
+
+            if (_client != null && _client.IsAvailable)
+            {
+                _client.Send("close");
+                Thread.Sleep(100);
+            }
+
+            _cts.Cancel();
+            _serverTask?.Wait();
+            _server?.Dispose();
+
+            _cts.Dispose();
+            _cts = null;
+            _serverTask = null;
+            _server = null;
+            _client = null;
+        }
+
+        public void SendData()
+        {
+            //TODO: send actual data to client
+            var agents = new object[1 + Cars.Count + Trucks.Count];
+            int index = 0;
+
+            // Add Frog
+            agents[index++] = new
+            {
+                id = Frog.AgentId,
+                breed = Frog.Breed,
+                x = Frog.Position.X,
+                y = Frog.Position.Y,
+                heading = 0
+            };
+            // Add Cars
+            foreach (var car in Cars)
+            {
+                agents[index++] = new
+                {
+                    id = car.AgentId,
+                    breed = car.Breed,
+                    x = car.Position.X,
+                    y = car.Position.Y,
+                    heading = car.Heading
+                };
+            }
+
+            // Add Trucks
+            foreach (var truck in Trucks)
+            {
+                agents[index++] = new
+                {
+                    id = truck.AgentId,
+                    breed = truck.Breed,
+                    x = truck.Position.X,
+                    y = truck.Position.Y,
+                    heading = truck.Heading
+                };
+            }
+
+            var payload = new
+            {
+                expectingTick = CurrentTick + 1,
+                agents
+            };
+            _lastMessage = JsonSerializer.Serialize(payload);
+            Console.WriteLine($"[WS] Sending data: {_lastMessage}");
+            _client?.Send(_lastMessage);
+        }
 
 
-    public bool Connected()
-    {
-        return _client != null && _client.IsAvailable;
+        public bool Connected()
+        {
+            return _client != null && _client.IsAvailable;
+        }
     }
-}

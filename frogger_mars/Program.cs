@@ -15,7 +15,9 @@ namespace frogger_mars
             //    - MyGridLayer kümmert sich intern um Simulation + Visualization
             var description = new ModelDescription();
             description.AddLayer<MyGridLayer>();
-            description.AddAgent<frogAgent, MyGridLayer>();
+            description.AddAgent<FrogAgent, MyGridLayer>();
+            description.AddAgent<CarAgent, MyGridLayer>();
+            description.AddAgent<TruckAgent, MyGridLayer>();
 
             // 2) Lese die Konfiguration aus config.json
             var file   = File.ReadAllText("config.json");

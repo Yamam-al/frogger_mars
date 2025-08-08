@@ -15,8 +15,12 @@ public class AbstractFroggerAgent : IAgent<MyGridLayer>
     {
         
     }
+    
 
     public Guid ID { get; set; }
+    public MyGridLayer Layer { get; set; }
     public Position Position { get; set; }
     public int AgentId { get; set; }
+    public string Breed { get; set; }
+    public int Heading { get; set; }
 }

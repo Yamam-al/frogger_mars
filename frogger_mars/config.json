@@ -21,8 +21,16 @@
   ],
   "agents": [
     {
-      "name": "frogAgent",
-      "count": 1
+      "name": "FrogAgent",
+      "count": 5
+    },
+    {
+      "name": "CarAgent",
+      "count": 4
+    },
+    {
+      "name": "TruckAgent",
+      "count": 7
     }
   ]
 }
