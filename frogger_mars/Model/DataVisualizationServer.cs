@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,45 +15,41 @@ public class DataVisualizationServer
     private static CancellationTokenSource _cts;
     private static Task _serverTask;
     private static string _lastMessage = string.Empty;
+
     public FrogAgent Frog { set; get; }
     public List<CarAgent> Cars { set; get; }
     public List<TruckAgent> Trucks { set; get; }
     public List<LogAgent> Logs { set; get; }
     public List<TurtleAgent> Turtles { set; get; }
     public List<PadAgent> Pads { set; get; }
+
     private int _lastInputTick = -1;
+
+    // --- Start-Gate ---
     private readonly ManualResetEventSlim _startGate = new(false);
     public bool Started => _startGate.IsSet;
-    
-    
-    private readonly List<int> _removeIds = new();
-    private int _lives = 5;
-
-    private bool _gameOverFlag = false;
-    public void SetGameOver(bool v) => _gameOverFlag = v;
-    
-    
-    public void EnqueueRemoval(int id) { lock (_removeIds) _removeIds.Add(id); }
-    public void SetLives(int v) => _lives = v;
-
     public void WaitForStart(CancellationToken? token = null)
     {
         if (!Started) _startGate.Wait(token ?? CancellationToken.None);
     }
-    public void ResetStartGate()
-    {
-        _startGate.Reset();
-    }
+    public void ResetStartGate() => _startGate.Reset();
 
-    // NEW: Pause/Resume
+    // --- Pause/Resume ---
     private readonly ManualResetEventSlim _pauseGate = new(true); // true = nicht pausiert
     public bool Paused => !_pauseGate.IsSet;
     public void WaitWhilePaused() => _pauseGate.Wait(); // blockt, wenn pausiert
-    private void Pause() => _pauseGate.Reset();
+    private void Pause()  => _pauseGate.Reset();
     private void Resume() => _pauseGate.Set();
-    public event Action RestartRequested;
 
+    // --- UI-State ---
+    private readonly List<int> _removeIds = new();
+    private int _lives = 5;
+    private bool _gameOverFlag = false;
 
+    public void EnqueueRemoval(int id) { lock (_removeIds) _removeIds.Add(id); }
+    public void SetLives(int v) => _lives = v;
+    public void SetGameOver(bool v) => _gameOverFlag = v;
+    public void ClearPendingRemovals(){ lock (_removeIds) _removeIds.Clear(); }
 
     public void Start()
     {
@@ -74,7 +68,7 @@ public class DataVisualizationServer
                     var s = message?.Trim();
                     Console.WriteLine($"[WS] raw: {s}");
 
-                    // 1) Bare or quoted number (ACK)
+                    // 1) Bare/quoted number (ACK)
                     if (TryParseTick(s, out var tick))
                     {
                         if (tick != CurrentTick + 1)
@@ -82,13 +76,12 @@ public class DataVisualizationServer
                             _client?.Send(_lastMessage);
                             return;
                         }
-
                         CurrentTick = tick;
                         return;
                     }
 
                     // 2) JSON object (input/control)
-                    var json = JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(s);
+                    var json = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(s);
 
                     if (json.TryGetValue("type", out var typeEl))
                     {
@@ -104,20 +97,26 @@ public class DataVisualizationServer
                                     Console.WriteLine("[Viz] START received");
                                     _client?.Send("{\"ack\":\"started\"}");
                                     return;
+
                                 case "pause":
                                     Pause();
                                     Console.WriteLine("[Viz] PAUSE received");
                                     _client?.Send("{\"ack\":\"paused\"}");
                                     return;
+
                                 case "resume":
                                     Resume();
                                     Console.WriteLine("[Viz] RESUME received");
                                     _client?.Send("{\"ack\":\"resumed\"}");
                                     return;
+
                                 case "restart":
+                                    // Godot fordert Neustart an → GameOver-Flag löschen,
+                                    // StartGate schließen; PreTick wartet wieder auf "start"
                                     _gameOverFlag = false;
-                                    ResetStartGate(); // PreTick blockt wieder, bis Godot "start" sendet
-                                    break;
+                                    ResetStartGate();
+                                    Console.WriteLine("[Viz] RESTART requested");
+                                    return;
                             }
                         }
 
@@ -131,11 +130,12 @@ public class DataVisualizationServer
 
                             Console.WriteLine($"📥 Input received: Direction: {direction}");
 
+                            if (Frog == null) return; // kein aktiver Frog (z. B. GameOver)
                             switch (direction)
                             {
-                                case "up": Frog.InputQueue.Enqueue(FrogInput.Up); break;
-                                case "down": Frog.InputQueue.Enqueue(FrogInput.Down); break;
-                                case "left": Frog.InputQueue.Enqueue(FrogInput.Left); break;
+                                case "up":    Frog.InputQueue.Enqueue(FrogInput.Up);    break;
+                                case "down":  Frog.InputQueue.Enqueue(FrogInput.Down);  break;
+                                case "left":  Frog.InputQueue.Enqueue(FrogInput.Left);  break;
                                 case "right": Frog.InputQueue.Enqueue(FrogInput.Right); break;
                             }
                         }
@@ -145,8 +145,6 @@ public class DataVisualizationServer
                 {
                     Console.WriteLine("❌ Error parsing WebSocket message: " + ex.Message);
                 }
-
-                ;
 
                 bool TryParseTick(string s, out int tick)
                 {
@@ -163,7 +161,7 @@ public class DataVisualizationServer
                         return true;
                     }
 
-                    // quoted int oder float
+                    // quoted int/float
                     if (s?.Length >= 2 && s[0] == '"' && s[^1] == '"')
                     {
                         var inner = s.Substring(1, s.Length - 2);
@@ -178,27 +176,20 @@ public class DataVisualizationServer
 
                     return false;
                 }
-
-
-                socket.OnClose = () => { _client = null; };
             };
+
+            socket.OnClose = () => { _client = null; };
         });
 
         while (!token.IsCancellationRequested)
-        {
             Thread.Sleep(100);
-        }
     }
 
-    public void RunInBackground()
-    {
-        _serverTask = Task.Run(() => Start());
-    }
+    public void RunInBackground() => _serverTask = Task.Run(() => Start());
 
     public void Stop()
     {
-        if (_cts == null)
-            return;
+        if (_cts == null) return;
 
         if (_client != null && _client.IsAvailable)
         {
@@ -221,7 +212,7 @@ public class DataVisualizationServer
     {
         var list = new List<object>();
 
-        // Frog NUR senden, wenn er existiert (sonst NullReference!)
+        // Frog NUR wenn vorhanden
         if (Frog != null)
         {
             list.Add(new {
@@ -248,24 +239,19 @@ public class DataVisualizationServer
         int[] removeIds;
         lock (_removeIds){ removeIds = _removeIds.ToArray(); _removeIds.Clear(); }
 
-        
         var payload = new
         {
             expectingTick = CurrentTick + 1,
             lives = _lives,
             gameOver = _gameOverFlag,
-            removeIds,                
+            removeIds,
             agents = list
         };
+
         _lastMessage = JsonSerializer.Serialize(payload);
         Console.WriteLine($"[WS] Sending data: {_lastMessage}");
         _client?.Send(_lastMessage);
     }
 
-
-
-    public bool Connected()
-    {
-        return _client != null && _client.IsAvailable;
-    }
+    public bool Connected() => _client != null && _client.IsAvailable;
 }
