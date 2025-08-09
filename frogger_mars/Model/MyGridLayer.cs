@@ -19,17 +19,27 @@ namespace frogger_mars.Model
         [PropertyDescription] public bool Visualization { get; set; }
         [PropertyDescription] public int VisualizationTimeout { get; set; }
 
-        public FrogAgent ActiveFrog;
         public List<CarAgent> Cars = new();
         public List<TruckAgent> Trucks = new();
         public List<TurtleAgent> Turtles = new();
         public List<LogAgent> Logs = new();
         public List<PadAgent> Pads = new();
         DataVisualizationServer _dataVisualizationServer = new DataVisualizationServer();
+        
+        private List<FrogAgent> _frogs;
+        public FrogAgent ActiveFrog;
+        private int _activeFrogIndex = 0;
+        private Position _frogStart;
+        private int _lives = 5;
+        
+        private bool _gameOver = false;
+        private LayerInitData _initDataCache; // speichert Init-Daten für Restart
+
 
         public override bool InitLayer(LayerInitData layerInitData, RegisterAgent registerAgentHandle,
             UnregisterAgent unregisterAgentHandle)
         {
+            _initDataCache = layerInitData;
             // the layer initialization requires a register and unregister agent handle
             if (registerAgentHandle == null) throw new ArgumentNullException(nameof(registerAgentHandle));
             if (unregisterAgentHandle == null) throw new ArgumentNullException(nameof(unregisterAgentHandle));
@@ -39,14 +49,14 @@ namespace frogger_mars.Model
             
             // the agent manager can create agents and initializes them as defined in the sim config
             var agentManager = layerInitData.Container.Resolve<IAgentManager>(); // resolve the agent manager
-            var frogAgents = agentManager.Spawn<FrogAgent, MyGridLayer>().ToList(); // the agents are instantiated on MyGridLayer
+            _frogs = agentManager.Spawn<FrogAgent, MyGridLayer>().ToList(); // the agents are instantiated on MyGridLayer
             Cars = agentManager.Spawn<CarAgent, MyGridLayer>().ToList();
             Trucks = agentManager.Spawn<TruckAgent, MyGridLayer>().ToList();
             Turtles = agentManager.Spawn<TurtleAgent, MyGridLayer>().ToList();
             Logs = agentManager.Spawn<LogAgent, MyGridLayer>().ToList();
             Pads = agentManager.Spawn<PadAgent, MyGridLayer>().ToList();
             int id = 0;
-            foreach (var frog in frogAgents)
+            foreach (var frog in _frogs)
             {
                 frog.AgentId = id++;
             }
@@ -75,13 +85,13 @@ namespace frogger_mars.Model
             {
                 pad.AgentId = id++;           
             }
-            Console.WriteLine($"We created {frogAgents.Count} frog agents.");
+            Console.WriteLine($"We created {_frogs.Count} frog agents.");
             Console.WriteLine($"We created {Cars.Count} car agents.");
             Console.WriteLine($"We created {Trucks.Count} truck agents.");
             Console.WriteLine($"We created {Turtles.Count} turtle agents.");
             Console.WriteLine($"We created {Logs.Count} log agents.");
             Console.WriteLine($"We created {Pads.Count} pad agents.");
-            ActiveFrog = frogAgents.First();
+            ActiveFrog = _frogs[_activeFrogIndex];
             
             // --- Sammel-Listen für Spots aus dem Grid ---
             var frogPlaced = false;
@@ -107,6 +117,7 @@ namespace frogger_mars.Model
                             if (!frogPlaced)
                             {
                                 ActiveFrog.Position = Position.CreatePosition(x, y);
+                                _frogStart = Position.CreatePosition(x, y);
                                 frogPlaced = true;
                                 Console.WriteLine($"Frog start position set to: ({x}, {y})");
                             }
@@ -207,6 +218,7 @@ namespace frogger_mars.Model
             _dataVisualizationServer.Logs = Logs;
             _dataVisualizationServer.Turtles = Turtles;
             _dataVisualizationServer.Pads = Pads;
+            _dataVisualizationServer.RestartRequested += RestartSimulation;
             _dataVisualizationServer.RunInBackground();
             
             return true; // the layer initialization was successful
@@ -214,17 +226,48 @@ namespace frogger_mars.Model
 
         public void Tick()
         {
+            if (_gameOver || ActiveFrog == null) return;
             
+            if (CollidesWithVehicle(ActiveFrog.Position))
+            {
+                _lives--;
+                var oldId = ActiveFrog.AgentId;
+
+                // nächsten aktiven Frog wählen (falls vorhanden)
+                _activeFrogIndex++;
+                if (_activeFrogIndex < _frogs.Count)
+                {
+                    ActiveFrog = _frogs[_activeFrogIndex];
+                    ActiveFrog.Position = _frogStart;
+
+                    // dem Viz-Server sagen: alten löschen, neuen verwenden & Lives updaten
+                    _dataVisualizationServer.EnqueueRemoval(oldId);
+                    _dataVisualizationServer.Frog = ActiveFrog;
+                    _dataVisualizationServer.SetLives(_lives);
+                }
+                else
+                {
+                    // Game over 
+                    Console.WriteLine("[Game] No frogs left.  — game over!");
+                    _gameOver = true;
+                    _dataVisualizationServer.EnqueueRemoval(oldId);
+                    _dataVisualizationServer.SetLives(_lives);
+                    _dataVisualizationServer.SetGameOver(true);
+                    _dataVisualizationServer.Frog = null;   
+                    ActiveFrog = null; 
+                }
+            }
         }
 
         public void PreTick()
         {
             // Warte bis Godot "Start" geschickt hat
-            if (!_dataVisualizationServer.Started)
+            if (!_dataVisualizationServer.Started || _gameOver)
             {
                 Console.WriteLine("[Viz] Waiting for START from client…");
                 _dataVisualizationServer.WaitForStart();
                 Console.WriteLine("[Viz] START received, beginning simulation.");
+                _gameOver = false; //Reset
             }
             // 2) Pro Tick ggf. auf Resume warten
             if (_dataVisualizationServer.Paused)
@@ -246,5 +289,25 @@ namespace frogger_mars.Model
             while (_dataVisualizationServer.CurrentTick != Context.CurrentTick + 1)
                 Thread.Sleep(VisualizationTimeout);
         }
+        private bool CollidesWithVehicle(Position p)
+        {
+            
+            return Cars.Any(c => c.Position.Equals(p)) ||
+                   Trucks.Any(t => t.Position.Equals(p));
+        }
+        private void RestartSimulation()
+        {
+            Console.WriteLine("[Game] Restarting simulation...");
+            _gameOver = false;
+            _lives = 5;
+            _activeFrogIndex = 0;
+
+            // Agents komplett neu spawnen:
+            InitLayer(_initDataCache, RegisterAgent, UnregisterAgent);
+
+            // Wieder auf Start warten
+            _dataVisualizationServer.ResetStartGate();
+        }
+
     }
 }

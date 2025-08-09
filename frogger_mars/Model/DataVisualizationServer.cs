@@ -26,10 +26,25 @@ public class DataVisualizationServer
     private int _lastInputTick = -1;
     private readonly ManualResetEventSlim _startGate = new(false);
     public bool Started => _startGate.IsSet;
+    
+    
+    private readonly List<int> _removeIds = new();
+    private int _lives = 5;
+
+    private bool _gameOverFlag = false;
+    public void SetGameOver(bool v) => _gameOverFlag = v;
+    
+    
+    public void EnqueueRemoval(int id) { lock (_removeIds) _removeIds.Add(id); }
+    public void SetLives(int v) => _lives = v;
 
     public void WaitForStart(CancellationToken? token = null)
     {
         if (!Started) _startGate.Wait(token ?? CancellationToken.None);
+    }
+    public void ResetStartGate()
+    {
+        _startGate.Reset();
     }
 
     // NEW: Pause/Resume
@@ -38,6 +53,8 @@ public class DataVisualizationServer
     public void WaitWhilePaused() => _pauseGate.Wait(); // blockt, wenn pausiert
     private void Pause() => _pauseGate.Reset();
     private void Resume() => _pauseGate.Set();
+    public event Action RestartRequested;
+
 
 
     public void Start()
@@ -97,6 +114,10 @@ public class DataVisualizationServer
                                     Console.WriteLine("[Viz] RESUME received");
                                     _client?.Send("{\"ack\":\"resumed\"}");
                                     return;
+                                case "restart":
+                                    _gameOverFlag = false;
+                                    ResetStartGate(); // PreTick blockt wieder, bis Godot "start" sendet
+                                    break;
                             }
                         }
 
@@ -200,11 +221,14 @@ public class DataVisualizationServer
     {
         var list = new List<object>();
 
-        // Frog
-        list.Add(new {
-            id = Frog.AgentId, breed = Frog.Breed,
-            x = Frog.Position.X, y = Frog.Position.Y, heading = 0
-        });
+        // Frog NUR senden, wenn er existiert (sonst NullReference!)
+        if (Frog != null)
+        {
+            list.Add(new {
+                id = Frog.AgentId, breed = Frog.Breed,
+                x = Frog.Position.X, y = Frog.Position.Y, heading = 0
+            });
+        }
 
         foreach (var car in Cars)
             list.Add(new { id = car.AgentId, breed = car.Breed, x = car.Position.X, y = car.Position.Y, heading = car.Heading });
@@ -221,7 +245,18 @@ public class DataVisualizationServer
         foreach (var pad in Pads)
             list.Add(new { id = pad.AgentId, breed = pad.Breed, x = pad.Position.X, y = pad.Position.Y, heading = pad.Heading });
 
-        var payload = new { expectingTick = CurrentTick + 1, agents = list };
+        int[] removeIds;
+        lock (_removeIds){ removeIds = _removeIds.ToArray(); _removeIds.Clear(); }
+
+        
+        var payload = new
+        {
+            expectingTick = CurrentTick + 1,
+            lives = _lives,
+            gameOver = _gameOverFlag,
+            removeIds,                
+            agents = list
+        };
         _lastMessage = JsonSerializer.Serialize(payload);
         Console.WriteLine($"[WS] Sending data: {_lastMessage}");
         _client?.Send(_lastMessage);
