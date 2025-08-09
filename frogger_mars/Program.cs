@@ -18,6 +18,9 @@ namespace frogger_mars
             description.AddAgent<FrogAgent, MyGridLayer>();
             description.AddAgent<CarAgent, MyGridLayer>();
             description.AddAgent<TruckAgent, MyGridLayer>();
+            description.AddAgent<TurtleAgent, MyGridLayer>();
+            description.AddAgent<PadAgent, MyGridLayer>();
+            description.AddAgent<LogAgent, MyGridLayer>();
 
             // 2) Lese die Konfiguration aus config.json
             var file   = File.ReadAllText("config.json");

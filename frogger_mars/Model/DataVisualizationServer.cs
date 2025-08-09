@@ -20,9 +20,13 @@ public class DataVisualizationServer
     public FrogAgent Frog { set; get; }
     public List<CarAgent> Cars { set; get; }
     public List<TruckAgent> Trucks { set; get; }
+    public List<LogAgent> Logs { set; get; }
+    public List<TurtleAgent> Turtles { set; get; }
+    public List<PadAgent> Pads { set; get; }
     private int _lastInputTick = -1;
     private readonly ManualResetEventSlim _startGate = new(false);
     public bool Started => _startGate.IsSet;
+
     public void WaitForStart(CancellationToken? token = null)
     {
         if (!Started) _startGate.Wait(token ?? CancellationToken.None);
@@ -32,10 +36,8 @@ public class DataVisualizationServer
     private readonly ManualResetEventSlim _pauseGate = new(true); // true = nicht pausiert
     public bool Paused => !_pauseGate.IsSet;
     public void WaitWhilePaused() => _pauseGate.Wait(); // blockt, wenn pausiert
-    private void Pause()  => _pauseGate.Reset();
+    private void Pause() => _pauseGate.Reset();
     private void Resume() => _pauseGate.Set();
-
-    
 
 
     public void Start()
@@ -117,7 +119,6 @@ public class DataVisualizationServer
                             }
                         }
                     }
-
                 }
                 catch (Exception ex)
                 {
@@ -162,93 +163,74 @@ public class DataVisualizationServer
             };
         });
 
-            while (!token.IsCancellationRequested)
-            {
-                Thread.Sleep(100);
-            }
-        }
-
-        public void RunInBackground()
+        while (!token.IsCancellationRequested)
         {
-            _serverTask = Task.Run(() => Start());
-        }
-
-        public void Stop()
-        {
-            if (_cts == null)
-                return;
-
-            if (_client != null && _client.IsAvailable)
-            {
-                _client.Send("close");
-                Thread.Sleep(100);
-            }
-
-            _cts.Cancel();
-            _serverTask?.Wait();
-            _server?.Dispose();
-
-            _cts.Dispose();
-            _cts = null;
-            _serverTask = null;
-            _server = null;
-            _client = null;
-        }
-
-        public void SendData()
-        {
-            //TODO: send actual data to client
-            var agents = new object[1 + Cars.Count + Trucks.Count];
-            int index = 0;
-
-            // Add Frog
-            agents[index++] = new
-            {
-                id = Frog.AgentId,
-                breed = Frog.Breed,
-                x = Frog.Position.X,
-                y = Frog.Position.Y,
-                heading = 0
-            };
-            // Add Cars
-            foreach (var car in Cars)
-            {
-                agents[index++] = new
-                {
-                    id = car.AgentId,
-                    breed = car.Breed,
-                    x = car.Position.X,
-                    y = car.Position.Y,
-                    heading = car.Heading
-                };
-            }
-
-            // Add Trucks
-            foreach (var truck in Trucks)
-            {
-                agents[index++] = new
-                {
-                    id = truck.AgentId,
-                    breed = truck.Breed,
-                    x = truck.Position.X,
-                    y = truck.Position.Y,
-                    heading = truck.Heading
-                };
-            }
-
-            var payload = new
-            {
-                expectingTick = CurrentTick + 1,
-                agents
-            };
-            _lastMessage = JsonSerializer.Serialize(payload);
-            Console.WriteLine($"[WS] Sending data: {_lastMessage}");
-            _client?.Send(_lastMessage);
-        }
-
-
-        public bool Connected()
-        {
-            return _client != null && _client.IsAvailable;
+            Thread.Sleep(100);
         }
     }
+
+    public void RunInBackground()
+    {
+        _serverTask = Task.Run(() => Start());
+    }
+
+    public void Stop()
+    {
+        if (_cts == null)
+            return;
+
+        if (_client != null && _client.IsAvailable)
+        {
+            _client.Send("close");
+            Thread.Sleep(100);
+        }
+
+        _cts.Cancel();
+        _serverTask?.Wait();
+        _server?.Dispose();
+
+        _cts.Dispose();
+        _cts = null;
+        _serverTask = null;
+        _server = null;
+        _client = null;
+    }
+
+    public void SendData()
+    {
+        var list = new List<object>();
+
+        // Frog
+        list.Add(new {
+            id = Frog.AgentId, breed = Frog.Breed,
+            x = Frog.Position.X, y = Frog.Position.Y, heading = 0
+        });
+
+        foreach (var car in Cars)
+            list.Add(new { id = car.AgentId, breed = car.Breed, x = car.Position.X, y = car.Position.Y, heading = car.Heading });
+
+        foreach (var truck in Trucks)
+            list.Add(new { id = truck.AgentId, breed = truck.Breed, x = truck.Position.X, y = truck.Position.Y, heading = truck.Heading });
+
+        foreach (var log in Logs)
+            list.Add(new { id = log.AgentId, breed = log.Breed, x = log.Position.X, y = log.Position.Y, heading = log.Heading });
+
+        foreach (var turtle in Turtles)
+            list.Add(new { id = turtle.AgentId, breed = turtle.Breed, x = turtle.Position.X, y = turtle.Position.Y, heading = turtle.Heading, hidden = turtle.Hidden });
+
+        foreach (var pad in Pads)
+            list.Add(new { id = pad.AgentId, breed = pad.Breed, x = pad.Position.X, y = pad.Position.Y, heading = pad.Heading });
+
+        var payload = new { expectingTick = CurrentTick + 1, agents = list };
+        _lastMessage = JsonSerializer.Serialize(payload);
+        Console.WriteLine($"[WS] Sending data: {_lastMessage}");
+        _client?.Send(_lastMessage);
+    }
+
+
+
+    public bool Connected()
+    {
+        return _client != null && _client.IsAvailable;
+    }
+}

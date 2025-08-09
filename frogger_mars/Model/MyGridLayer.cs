@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using System.Threading;
 using Mars.Components.Layers;
@@ -20,9 +19,12 @@ namespace frogger_mars.Model
         [PropertyDescription] public bool Visualization { get; set; }
         [PropertyDescription] public int VisualizationTimeout { get; set; }
 
-        public FrogAgent Frog;
+        public FrogAgent ActiveFrog;
         public List<CarAgent> Cars = new();
         public List<TruckAgent> Trucks = new();
+        public List<TurtleAgent> Turtles = new();
+        public List<LogAgent> Logs = new();
+        public List<PadAgent> Pads = new();
         DataVisualizationServer _dataVisualizationServer = new DataVisualizationServer();
 
         public override bool InitLayer(LayerInitData layerInitData, RegisterAgent registerAgentHandle,
@@ -40,25 +42,46 @@ namespace frogger_mars.Model
             var frogAgents = agentManager.Spawn<FrogAgent, MyGridLayer>().ToList(); // the agents are instantiated on MyGridLayer
             Cars = agentManager.Spawn<CarAgent, MyGridLayer>().ToList();
             Trucks = agentManager.Spawn<TruckAgent, MyGridLayer>().ToList();
-            int ID = 0;
+            Turtles = agentManager.Spawn<TurtleAgent, MyGridLayer>().ToList();
+            Logs = agentManager.Spawn<LogAgent, MyGridLayer>().ToList();
+            Pads = agentManager.Spawn<PadAgent, MyGridLayer>().ToList();
+            int id = 0;
             foreach (var frog in frogAgents)
             {
-                frog.AgentId = ID++;
+                frog.AgentId = id++;
             }
 
             foreach (var car in Cars)
             {
-                car.AgentId = ID++;
+                car.AgentId = id++;
             }
 
             foreach (var truck in Trucks)
             {
-                truck.AgentId = ID++;           
+                truck.AgentId = id++;           
+            }
+
+            foreach (var turtle in Turtles)
+            {
+                turtle.AgentId = id++;
+            }
+
+            foreach (var log in Logs)
+            {
+                log.AgentId = id++;
+            }
+
+            foreach (var pad in Pads)
+            {
+                pad.AgentId = id++;           
             }
             Console.WriteLine($"We created {frogAgents.Count} frog agents.");
             Console.WriteLine($"We created {Cars.Count} car agents.");
             Console.WriteLine($"We created {Trucks.Count} truck agents.");
-            Frog = frogAgents.First();
+            Console.WriteLine($"We created {Turtles.Count} turtle agents.");
+            Console.WriteLine($"We created {Logs.Count} log agents.");
+            Console.WriteLine($"We created {Pads.Count} pad agents.");
+            ActiveFrog = frogAgents.First();
             
             // --- Sammel-Listen für Spots aus dem Grid ---
             var frogPlaced = false;
@@ -66,6 +89,9 @@ namespace frogger_mars.Model
             var carSpots180 = new List<Position>();
             var truckSpots0   = new List<Position>();
             var truckSpots180 = new List<Position>();
+            var turtleSpots   = new List<Position>();
+            var logSpots      = new List<Position>();
+            var padSpots      = new List<Position>();
             
             // Startpositionen aus Grid auslesen
             
@@ -80,7 +106,7 @@ namespace frogger_mars.Model
                         case 1.0: // Frog
                             if (!frogPlaced)
                             {
-                                Frog.Position = Position.CreatePosition(x, y);
+                                ActiveFrog.Position = Position.CreatePosition(x, y);
                                 frogPlaced = true;
                                 Console.WriteLine($"Frog start position set to: ({x}, {y})");
                             }
@@ -100,6 +126,15 @@ namespace frogger_mars.Model
 
                         case 5.0: // Car heading 180
                             carSpots180.Add(Position.CreatePosition(x, y));
+                            break;
+                        case 6.0: // Log
+                            logSpots.Add(Position.CreatePosition(x, y));
+                            break;
+                        case 7.0: // Turtle
+                            turtleSpots.Add(Position.CreatePosition(x, y));
+                            break;
+                        case 8.0: // Pad
+                            padSpots.Add(Position.CreatePosition(x, y));
                             break;
                     }
                 }
@@ -137,13 +172,41 @@ namespace frogger_mars.Model
                 Trucks[ti].Heading  = 180;
                 ti++;
             }
+            
+            // --- Logs zuweisen
+            int li = 0;
+            foreach (var p in logSpots)
+            {
+                if (li >= Logs.Count) {Console.WriteLine("⚠️ Mehr Logs-Spots als Trucks.");}
+                Logs[li].Position = p;
+                li++;
+            }
+            // --- Tutrles zuweisen
+            int tri = 0;
+            foreach (var p in turtleSpots)
+            {
+                if (tri >= Turtles.Count) {Console.WriteLine("⚠️ Mehr Turtles-Spots als Trucks.");}
+                Turtles[tri].Position = p;
+                tri++;
+            }
+            // --- Pads zuweisen
+            int pi = 0;
+            foreach (var p in padSpots)
+            {
+                if (pi >= Pads.Count) {Console.WriteLine("⚠️ Mehr Pads-Spots als Trucks.");}
+                Pads[pi].Position = p;
+                pi++;
+            }
 
-            Console.WriteLine($"Placed {ci}/{Cars.Count} cars and {ti}/{Trucks.Count} trucks from grid.");
+            Console.WriteLine($"Placed {ci}/{Cars.Count} cars, {ti}/{Trucks.Count} trucks, {li}/{Logs.Count} logs, {tri}/{Turtles.Count} turtles and {pi}/{Pads.Count} pads,from grid.");
             
             // run server in background
-            _dataVisualizationServer.Frog = Frog;
+            _dataVisualizationServer.Frog = ActiveFrog;
             _dataVisualizationServer.Cars = Cars;
             _dataVisualizationServer.Trucks = Trucks;  
+            _dataVisualizationServer.Logs = Logs;
+            _dataVisualizationServer.Turtles = Turtles;
+            _dataVisualizationServer.Pads = Pads;
             _dataVisualizationServer.RunInBackground();
             
             return true; // the layer initialization was successful

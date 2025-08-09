@@ -31,6 +31,18 @@
     {
       "name": "TruckAgent",
       "count": 7
+    },
+    {
+      "name": "LogAgent",
+      "count": 21
+    },
+    {
+      "name": "TurtleAgent",
+      "count": 16
+    },
+    {
+      "name": "PadAgent",
+      "count": 5
     }
   ]
 }
