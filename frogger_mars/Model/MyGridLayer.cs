@@ -24,19 +24,16 @@ namespace frogger_mars.Model
 
         private readonly DataVisualizationServer _dataVisualizationServer = new();
 
-        private List<FrogAgent> _frogs;
-        public FrogAgent ActiveFrog;
-        private int _activeFrogIndex = 0;
+        private List<FrogAgent> _frogs;        // wir nutzen nur den ersten als aktiven
+        public  FrogAgent ActiveFrog;
         private Position _frogStart;
         private int _lives = 5;
-
         private bool _gameOver = false;
+
         public override bool InitLayer(LayerInitData layerInitData, RegisterAgent registerAgentHandle, UnregisterAgent unregisterAgentHandle)
         {
-            // base init
             base.InitLayer(layerInitData, registerAgentHandle, unregisterAgentHandle);
 
-            // spawn
             var agentManager = layerInitData.Container.Resolve<IAgentManager>();
             _frogs  = agentManager.Spawn<FrogAgent, MyGridLayer>().ToList();
             Cars    = agentManager.Spawn<CarAgent, MyGridLayer>().ToList();
@@ -61,7 +58,7 @@ namespace frogger_mars.Model
             Console.WriteLine($"We created {Logs.Count} log agents.");
             Console.WriteLine($"We created {Pads.Count} pad agents.");
 
-            ActiveFrog = _frogs[_activeFrogIndex];
+            ActiveFrog = _frogs.First(); // nur der erste ist aktiv
 
             // Grid lesen
             var frogPlaced   = false;
@@ -145,7 +142,7 @@ namespace frogger_mars.Model
             foreach (var p in padSpots)
             {
                 if (pi >= Pads.Count) break;
-                Pads[pi].Position = p; pi++;
+                Pads[pi].Position = p; Pads[pi].Occupied = false; Pads[pi].OccupiedByFrogId = null; pi++;
             }
 
             Console.WriteLine($"Placed {ci}/{Cars.Count} cars, {ti}/{Trucks.Count} trucks, {li}/{Logs.Count} logs, {tri}/{Turtles.Count} turtles and {pi}/{Pads.Count} pads, from grid.");
@@ -164,8 +161,6 @@ namespace frogger_mars.Model
 
         public void PreTick()
         {
-            // Nach GameOver: wir haben das StartGate bei GameOver geschlossen.
-            // Hier warten wir erneut auf START, setzen danach den Spielzustand frisch.
             if (!_dataVisualizationServer.Started || _gameOver)
             {
                 Console.WriteLine("[Viz] Waiting for START from client…");
@@ -186,103 +181,58 @@ namespace frogger_mars.Model
         {
             if (_gameOver || ActiveFrog == null) return;
 
-            // 1. Log/Turtle Mitbewegung
-            var log = Logs.FirstOrDefault(l => l.Position.Equals(ActiveFrog.Position));
-            var turtle = Turtles.FirstOrDefault(t => t.Position.Equals(ActiveFrog.Position));
+            // --- 1) Mittragen auf Log/Turtle + Wasserfall ---
+            var logUnder    = Logs.FirstOrDefault(l => l.Position.Equals(ActiveFrog.Position));
+            var turtleUnder = Turtles.FirstOrDefault(t => t.Position.Equals(ActiveFrog.Position));
 
-            if (log != null)
+            if (logUnder != null)
             {
                 CarryFrogWithLog();
             }
-            else if (turtle != null)
+            else if (turtleUnder != null)
             {
-                if (turtle.Hidden)
+                if (turtleUnder.Hidden)
                 {
-                    // Turtle ist unter Wasser → Frog ertrinkt
                     KillActiveFrog();
                     return;
                 }
-                else
-                {
-                    CarryFrogWithTurtle();
-                }
+                CarryFrogWithTurtle();
             }
             else if (IsWaterTile(ActiveFrog.Position))
             {
-                // Kein Log/Turtle → ins Wasser gefallen
                 KillActiveFrog();
                 return;
             }
 
-            // 2. Kollision mit Fahrzeugen
+            // --- 2) Pad-Landung: Pad besetzen, Frog zurück zum Start (keine Leben verlieren) ---
+            var pad = Pads.FirstOrDefault(pd => pd.Position.Equals(ActiveFrog.Position));
+            if (pad != null)
+            {
+                if (!pad.Occupied)
+                {
+                    pad.Occupied = true;
+                    pad.OccupiedByFrogId = ActiveFrog.AgentId;
+
+                    ResetActiveFrogToStart(); // setzt Position & Jumps=0
+
+                    // Win: alle Pads belegt?
+                    if (Pads.All(pd => pd.Occupied))
+                    {
+                        _gameOver = true; // treat as win - gleicher Flow wie GameOver
+                        _dataVisualizationServer.SetGameOver(true);
+                        _dataVisualizationServer.Frog = null;
+                        _dataVisualizationServer.ResetStartGate();
+                    }
+                }
+                return; // nach Pad-Landung keine weitere Prüfung
+            }
+
+            // --- 3) Kollision mit Fahrzeugen ---
             if (CollidesWithVehicle(ActiveFrog.Position))
             {
                 KillActiveFrog();
             }
         }
-
-        private void CarryFrogWithLog()
-        {
-            // Log bewegt sich alle 2 Ticks (siehe LogAgent: erster Tick kein Move, dann Move, ...).
-            // In deiner Sim startet Tick bei 1 -> Logs bewegen auf geraden Ticks.
-            if (Context.CurrentTick % 2 == 0)
-            {
-                var x = ActiveFrog.Position.X + 1;
-                if (x >= Width) x = 0; // gleiches Wrap wie im LogAgent
-                ActiveFrog.Position = Position.CreatePosition(x, ActiveFrog.Position.Y);
-            }
-        }
-
-        private void CarryFrogWithTurtle()
-        {
-            // Turtle geht jeden Tick nach links
-            var x = ActiveFrog.Position.X - 1;
-            if (x < 0) x = Width - 1; // linkes Wrap (safe: 0..Width-1)
-            ActiveFrog.Position = Position.CreatePosition(x, ActiveFrog.Position.Y);
-        }
-
-        private void KillActiveFrog()
-        {
-            _lives--;
-            var oldId = ActiveFrog.AgentId;
-
-            _activeFrogIndex++;
-            if (_activeFrogIndex < _frogs.Count)
-            {
-                ActiveFrog = _frogs[_activeFrogIndex];
-                ActiveFrog.Position = _frogStart;
-
-                _dataVisualizationServer.EnqueueRemoval(oldId);
-                _dataVisualizationServer.Frog = ActiveFrog;
-                _dataVisualizationServer.SetLives(_lives);
-            }
-            else
-            {
-                Console.WriteLine("[Game] No frogs left — game over!");
-                _gameOver = true;
-
-                _dataVisualizationServer.EnqueueRemoval(oldId);
-                _dataVisualizationServer.SetLives(_lives);
-                _dataVisualizationServer.SetGameOver(true);
-                _dataVisualizationServer.Frog = null;
-                _dataVisualizationServer.ResetStartGate();
-            }
-        }
-
-        private bool IsWaterTile(Position p)
-        {
-            // Wasserbereich in Y-Koordinaten
-            if (p.Y >= 0 && p.Y <= 6)
-            {
-                bool onLog = Logs.Any(l => l.Position.Equals(p));
-                bool onTurtle = Turtles.Any(t => t.Position.Equals(p));
-                bool onPad = Pads.Any(pad => pad.Position.Equals(p));
-                return !onLog && !onTurtle && !onPad;
-            }
-            return false; // Außerhalb des Wasserbereichs
-        }
-
-        
 
         public void PostTick()
         {
@@ -295,6 +245,66 @@ namespace frogger_mars.Model
 
             while (_dataVisualizationServer.CurrentTick != Context.CurrentTick + 1)
                 Thread.Sleep(VisualizationTimeout);
+        }
+
+        // ---------- Helpers ----------
+
+        private void CarryFrogWithLog()
+        {
+            // Log bewegt sich alle 2 Ticks nach rechts (Tick 2,4,6,...) -> Frog folgt dann mit
+            if (Context.CurrentTick % 2 == 0)
+            {
+                var x = ActiveFrog.Position.X + 1;
+                if (x >= Width) x = 0;
+                ActiveFrog.Position = Position.CreatePosition(x, ActiveFrog.Position.Y);
+            }
+        }
+
+        private void CarryFrogWithTurtle()
+        {
+            // Turtle bewegt sich jeden Tick nach links
+            var x = ActiveFrog.Position.X - 1;
+            if (x < 0) x = Width - 1;
+            ActiveFrog.Position = Position.CreatePosition(x, ActiveFrog.Position.Y);
+        }
+
+        private void KillActiveFrog()
+        {
+            _lives--;
+
+            // Reset & Jumps zurücksetzen
+            ResetActiveFrogToStart();
+
+            _dataVisualizationServer.SetLives(_lives);
+
+            if (_lives <= 0)
+            {
+                Console.WriteLine("[Game] No lives left — game over!");
+                _gameOver = true;
+
+                _dataVisualizationServer.SetGameOver(true);
+                _dataVisualizationServer.Frog = null;
+                _dataVisualizationServer.ResetStartGate();
+            }
+        }
+
+        private void ResetActiveFrogToStart()
+        {
+            ActiveFrog.Position = _frogStart;
+            ActiveFrog.Jumps = 0;
+        }
+
+        private bool IsWaterTile(Position pos)
+        {
+            // Wasserbereich (Y-Zeilen) je nach Level anpassen – hier Beispiel: 0..6
+            if (pos.Y >= 0 && pos.Y <= 6)
+            {
+                bool onLog    = Logs.Any(log    => log.Position.Equals(pos));
+                bool onTurtle = Turtles.Any(tut => tut.Position.Equals(pos));
+                bool onPad    = Pads.Any(pad    => pad.Position.Equals(pos));
+                return !onLog && !onTurtle && !onPad;
+            }
+            return false;
         }
 
         private bool CollidesWithVehicle(Position p)
@@ -311,13 +321,18 @@ namespace frogger_mars.Model
             _lives = 5;
             _gameOver = false;
 
-            _activeFrogIndex = 0;
-            ActiveFrog = _frogs[_activeFrogIndex];
+            // Pads freigeben
+            foreach (var pd in Pads)
+            {
+                pd.Occupied = false;
+                pd.OccupiedByFrogId = null;
+            }
 
-            // zurück auf Startfeld
+            // aktiven Frog laden (falls config >1 Frog hat, nimm den ersten)
+            ActiveFrog = _frogs.First();
             ActiveFrog.Position = _frogStart;
+            ActiveFrog.Jumps = 0;
 
-            // Visualisierung säubern/setzen
             _dataVisualizationServer.ClearPendingRemovals();
             _dataVisualizationServer.SetGameOver(false);
             _dataVisualizationServer.SetLives(_lives);

@@ -37,7 +37,7 @@ public class DataVisualizationServer
     // --- Pause/Resume ---
     private readonly ManualResetEventSlim _pauseGate = new(true); // true = nicht pausiert
     public bool Paused => !_pauseGate.IsSet;
-    public void WaitWhilePaused() => _pauseGate.Wait(); // blockt, wenn pausiert
+    public void WaitWhilePaused() => _pauseGate.Wait();
     private void Pause()  => _pauseGate.Reset();
     private void Resume() => _pauseGate.Set();
 
@@ -111,10 +111,8 @@ public class DataVisualizationServer
                                     return;
 
                                 case "restart":
-                                    // Godot fordert Neustart an → GameOver-Flag löschen,
-                                    // StartGate schließen; PreTick wartet wieder auf "start"
                                     _gameOverFlag = false;
-                                    ResetStartGate();
+                                    ResetStartGate(); // PreTick blockt wieder
                                     Console.WriteLine("[Viz] RESTART requested");
                                     return;
                             }
@@ -128,9 +126,7 @@ public class DataVisualizationServer
                             if (_lastInputTick == CurrentTick) return;
                             _lastInputTick = CurrentTick;
 
-                            Console.WriteLine($"📥 Input received: Direction: {direction}");
-
-                            if (Frog == null) return; // kein aktiver Frog (z. B. GameOver)
+                            if (Frog == null) return;
                             switch (direction)
                             {
                                 case "up":    Frog.InputQueue.Enqueue(FrogInput.Up);    break;
@@ -150,30 +146,22 @@ public class DataVisualizationServer
                 {
                     tick = default;
 
-                    // bare int
                     if (int.TryParse(s, out tick)) return true;
 
-                    // bare float, z.B. 2.0
                     if (double.TryParse(s, System.Globalization.NumberStyles.Float,
                             System.Globalization.CultureInfo.InvariantCulture, out var dbl))
                     {
-                        tick = (int)dbl;
-                        return true;
+                        tick = (int)dbl; return true;
                     }
 
-                    // quoted int/float
                     if (s?.Length >= 2 && s[0] == '"' && s[^1] == '"')
                     {
                         var inner = s.Substring(1, s.Length - 2);
                         if (int.TryParse(inner, out tick)) return true;
                         if (double.TryParse(inner, System.Globalization.NumberStyles.Float,
                                 System.Globalization.CultureInfo.InvariantCulture, out dbl))
-                        {
-                            tick = (int)dbl;
-                            return true;
-                        }
+                        { tick = (int)dbl; return true; }
                     }
-
                     return false;
                 }
             };
@@ -212,12 +200,16 @@ public class DataVisualizationServer
     {
         var list = new List<object>();
 
-        // Frog NUR wenn vorhanden
+        // Frog nur wenn vorhanden – inkl. Jumps
         if (Frog != null)
         {
             list.Add(new {
-                id = Frog.AgentId, breed = Frog.Breed,
-                x = Frog.Position.X, y = Frog.Position.Y, heading = 0
+                id = Frog.AgentId,
+                breed = Frog.Breed,
+                x = Frog.Position.X,
+                y = Frog.Position.Y,
+                heading = 0,
+                jumps = Frog.Jumps
             });
         }
 
@@ -234,7 +226,7 @@ public class DataVisualizationServer
             list.Add(new { id = turtle.AgentId, breed = turtle.Breed, x = turtle.Position.X, y = turtle.Position.Y, heading = turtle.Heading, hidden = turtle.Hidden });
 
         foreach (var pad in Pads)
-            list.Add(new { id = pad.AgentId, breed = pad.Breed, x = pad.Position.X, y = pad.Position.Y, heading = pad.Heading });
+            list.Add(new { id = pad.AgentId, breed = pad.Breed, x = pad.Position.X, y = pad.Position.Y, heading = pad.Heading, occupied = pad.Occupied });
 
         int[] removeIds;
         lock (_removeIds){ removeIds = _removeIds.ToArray(); _removeIds.Clear(); }
