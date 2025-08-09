@@ -10,7 +10,7 @@
   "layers": [
     {
       "name": "MyGridLayer",
-      "file": "Resources/grid.csv",
+      "file": "Resources/level1Grid.csv",
       "mapping": [
         {
           "parameter": "VisualizationTimeout",
