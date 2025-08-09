@@ -23,10 +23,11 @@ public class CarAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
     }
     private void MoveForward()
     {
+        // Heading in the original object is up
         if (Heading == 90)
         {
             Position.X++;
-            if (Position.X >= Layer.Width - 1)
+            if (Position.X >= Layer.Width)
             {
                 Position.X = 0;
             }
@@ -36,7 +37,7 @@ public class CarAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
             Position.X--;
             if (Position.X <= 0)
             {
-                Position.X = Layer.Width - 1;
+                Position.X = Layer.Width;
             }       
         }
     }

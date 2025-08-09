@@ -11,10 +11,25 @@ public class LogAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
         Breed = "log";
         Heading = 0;
     }
-        
+
+    private int _everSecondTick = -1;
+
     // The Tick() method is called by the agent manager in every tick of the simulation.
     public void Tick()
     {
+        _everSecondTick = _everSecondTick * -1;
+        if (_everSecondTick < 0)
+        {
+            MoveForward();
+        }
     }
-    
+
+    private void MoveForward()
+    {
+        Position.X++;
+        if (Position.X >= Layer.Width)
+        {
+            Position.X = 0;
+        }
+    }
 }

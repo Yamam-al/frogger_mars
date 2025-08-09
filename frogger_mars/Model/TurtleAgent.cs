@@ -10,11 +10,23 @@ public class TurtleAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
     {
         Layer = layer; // store layer for access within agent class
         Breed = "turtle";
-        Heading = 180;
+        Heading = 0;
     }
+    
         
     // The Tick() method is called by the agent manager in every tick of the simulation.
     public void Tick()
     {
+        MoveForward();
     }
+    
+    private void MoveForward()
+    {
+        Position.X--;
+        if (Position.X <= 0)
+        {
+            Position.X = Layer.Width;
+        }   
+    }
+    
 }

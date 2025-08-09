@@ -31,7 +31,7 @@ public class TruckAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
         if (Heading == 180)
         {
             Position.X++;
-            if (Position.X >= Layer.Width - 1)
+            if (Position.X >= Layer.Width)
             {
                 Position.X = 0;
             }
@@ -41,7 +41,7 @@ public class TruckAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
             Position.X--;
             if (Position.X <= 0)
             {
-                Position.X = Layer.Width - 1;
+                Position.X = Layer.Width;
             }       
         }
     }
