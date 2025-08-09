@@ -4,6 +4,8 @@ namespace frogger_mars.Model;
 
 public class LogAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
 {
+    private const int MovePeriod = 3; // nur alle 3 Ticks
+
     //  The Init() method is called by the agent manager after the agent is created.
     public void Init(MyGridLayer layer)
     {
@@ -12,16 +14,13 @@ public class LogAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
         Heading = 0;
     }
 
-    private int _everSecondTick = -1;
 
     // The Tick() method is called by the agent manager in every tick of the simulation.
     public void Tick()
     {
-        _everSecondTick = _everSecondTick * -1;
-        if (_everSecondTick < 0)
-        {
-            MoveForward();
-        }
+        if (Layer.Context.CurrentTick % MovePeriod != 0) return;
+
+        MoveForward();
     }
 
     private void MoveForward()
