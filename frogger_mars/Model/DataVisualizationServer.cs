@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
@@ -7,64 +7,114 @@ using Fleck;
 
 namespace frogger_mars.Model;
 
+/// <summary>
+/// WebSocket bridge between the simulation (MARS) and the Godot frontend.
+/// Handles start/pause/resume/restart, input events, and streams the full state each tick.
+/// </summary>
 public class DataVisualizationServer
 {
+    /// <summary>Tick the client should ACK with (server expects +1 each loop).</summary>
     public volatile int CurrentTick = 1;
+
     private static IWebSocketConnection _client;
     private static WebSocketServer _server;
     private static CancellationTokenSource _cts;
     private static Task _serverTask;
     private static string _lastMessage = string.Empty;
 
+    /// <summary>Reference to the single active frog (null if game over).</summary>
     public FrogAgent Frog { set; get; }
+
+    /// <summary>References to all car agents.</summary>
     public List<CarAgent> Cars { set; get; }
+
+    /// <summary>References to all truck agents.</summary>
     public List<TruckAgent> Trucks { set; get; }
+
+    /// <summary>References to all log agents.</summary>
     public List<LogAgent> Logs { set; get; }
+
+    /// <summary>References to all turtle agents.</summary>
     public List<TurtleAgent> Turtles { set; get; }
+
+    /// <summary>References to all pad agents (goal slots).</summary>
     public List<PadAgent> Pads { set; get; }
 
     // --- Anti-double-input Guards ---
     private int  _lastInputTick = -1;            // legacy guard
-    private bool _acceptedInputThisTick = false; // nur 1 Input pro Tick
+    private bool _acceptedInputThisTick = false; // only one input per tick
 
     // --- Time ---
     private int _timeLeft = 0;                           // shown to Godot
-    public  int StartTimeSeconds { get; private set; } = 60; // setzbar aus Godot
+    /// <summary>Configurable initial time limit per life (settable via Godot control).</summary>
+    public  int StartTimeSeconds { get; private set; } = 60; // set from Godot
+    /// <summary>Update the remaining time that the client will display.</summary>
     public void SetTimeLeft(int v) => _timeLeft = Math.Max(0, v);
 
     // --- Lives/Level ---
-    public int StartLives { get; private set; } = 5;     // setzbar aus Godot
-    public int StartLevel { get; private set; } = 1;     // setzbar aus Godot (1-basiert)
+    /// <summary>Configurable number of lives to start with (settable via Godot).</summary>
+    public int StartLives { get; private set; } = 5;     // set from Godot
+    /// <summary>Configurable level index to spawn (1-based; settable via Godot).</summary>
+    public int StartLevel { get; private set; } = 1;     // set from Godot (1-based)
 
     // --- Start-Gate ---
     private readonly ManualResetEventSlim _startGate = new(false);
+    /// <summary>True once a "start" control message has been received.</summary>
     public bool Started => _startGate.IsSet;
+
+    /// <summary>
+    /// Blocks the caller until a "start" command has been received from the client.
+    /// </summary>
+    /// <param name="token">Optional cancellation token.</param>
     public void WaitForStart(CancellationToken? token = null)
     {
         if (!Started) _startGate.Wait(token ?? CancellationToken.None);
     }
+
+    /// <summary>
+    /// Resets the start gate so the simulation waits for another "start" signal.
+    /// </summary>
     public void ResetStartGate() => _startGate.Reset();
 
     // --- Pause/Resume ---
-    private readonly ManualResetEventSlim _pauseGate = new(true); // true = nicht pausiert
+    private readonly ManualResetEventSlim _pauseGate = new(true); // true = not paused
+    /// <summary>True if the simulation is paused.</summary>
     public bool Paused => !_pauseGate.IsSet;
+
+    /// <summary>Blocks while paused until a "resume" command arrives.</summary>
     public void WaitWhilePaused() => _pauseGate.Wait();
+
+    /// <summary>Sets the pause state.</summary>
     private void Pause()  => _pauseGate.Reset();
+
+    /// <summary>Clears the pause state.</summary>
     private void Resume() => _pauseGate.Set();
 
     // --- UI-State ---
     private readonly List<int> _removeIds = new();
     private int _lives = 5;
 
+    /// <summary>Adds an id to be removed by the Godot client on the next frame.</summary>
     public void EnqueueRemoval(int id) { lock (_removeIds) _removeIds.Add(id); }
+
+    /// <summary>Updates the life counter the client shows.</summary>
     public void SetLives(int v) => _lives = v;
+
     private bool _gameOverFlag = false;
     private bool _gameWonFlag = false;
+
+    /// <summary>Sets the game-over flag (read by Godot HUD).</summary>
     public void SetGameOver(bool v) => _gameOverFlag = v;
+
+    /// <summary>Sets the game-won flag (read by Godot HUD).</summary>
     public void SetGameWon(bool v)  => _gameWonFlag  = v;
 
+    /// <summary>Clears the removal queue.</summary>
     public void ClearPendingRemovals(){ lock (_removeIds) _removeIds.Clear(); }
 
+    /// <summary>
+    /// Starts the WebSocket server and processes client messages (blocking).
+    /// </summary>
     public void Start()
     {
         _cts = new CancellationTokenSource();
@@ -91,7 +141,7 @@ public class DataVisualizationServer
                             return;
                         }
                         CurrentTick = tick;
-                        _acceptedInputThisTick = false; // neuer Tick => wieder 1 Input erlaubt
+                        _acceptedInputThisTick = false; // new tick => allow 1 input again
                         return;
                     }
 
@@ -128,9 +178,9 @@ public class DataVisualizationServer
                                 case "restart":
                                     _gameOverFlag = false;
                                     _gameWonFlag  = false;
-                                    ResetStartGate(); // PreTick blockt wieder
-                                    Console.WriteLine("[Viz] RESTART requested");
-                                    // Lives UI beim Restart auf StartLives spiegeln
+                                    ResetStartGate(); // PreTick blocks again
+                                    Console.WriteLine("[Viz] RESTART requested]");
+                                    // mirror lives in HUD on restart
                                     SetLives(StartLives);
                                     return;
 
@@ -148,7 +198,7 @@ public class DataVisualizationServer
                                     {
                                         var lives = Math.Clamp(liv.GetInt32(), 1, 99);
                                         StartLives = lives;
-                                        SetLives(StartLives); // optional: direkt an UI spiegeln
+                                        SetLives(StartLives); // optionally mirror directly to HUD
                                         Console.WriteLine($"[Viz] Start lives set to {StartLives}");
                                     }
                                     return;
@@ -168,7 +218,7 @@ public class DataVisualizationServer
                         {
                             var direction = json["direction"].GetString();
 
-                            // nur 1 Input pro Tick
+                            // one input per tick max
                             if (_acceptedInputThisTick) return;
                             if (_lastInputTick == CurrentTick) return;
 
@@ -177,7 +227,7 @@ public class DataVisualizationServer
 
                             if (Frog == null) return;
 
-                            // Queue entmüllen: max. 1 Input im Puffer
+                            // keep queue tight: allow only the latest input
                             while (Frog.InputQueue.Count > 0) Frog.InputQueue.TryDequeue(out _);
 
                             switch (direction)
@@ -195,6 +245,7 @@ public class DataVisualizationServer
                     Console.WriteLine("❌ Error parsing WebSocket message: " + ex.Message);
                 }
 
+                // Local function that parses ACK-like tick values (number or quoted number).
                 bool TryParseTick(string s, out int tick)
                 {
                     tick = default;
@@ -222,12 +273,19 @@ public class DataVisualizationServer
             socket.OnClose = () => { _client = null; };
         });
 
+        // Keep the thread alive while running.
         while (!token.IsCancellationRequested)
             Thread.Sleep(100);
     }
 
+    /// <summary>
+    /// Starts the WebSocket loop on a background task.
+    /// </summary>
     public void RunInBackground() => _serverTask = Task.Run(() => Start());
 
+    /// <summary>
+    /// Stops the WebSocket server and cleans up resources.
+    /// </summary>
     public void Stop()
     {
         if (_cts == null) return;
@@ -249,6 +307,10 @@ public class DataVisualizationServer
         _client = null;
     }
 
+    /// <summary>
+    /// Serializes the current agent state and pushes it to the client.
+    /// Also caches the payload so we can re-send it when the ACK is unexpected.
+    /// </summary>
     public void SendData()
     {
         var list = new List<object>();
@@ -299,5 +361,8 @@ public class DataVisualizationServer
         _client?.Send(_lastMessage);
     }
 
+    /// <summary>
+    /// Returns whether a WebSocket client is currently connected.
+    /// </summary>
     public bool Connected() => _client != null && _client.IsAvailable;
 }

@@ -13,13 +13,27 @@ using Mars.Interfaces.Layers;
 
 namespace frogger_mars.Model
 {
+    /// <summary>
+    /// Main simulation layer hosting the grid, agents and game logic.
+    /// Handles level loading, timing, lives, collision checks and the conveyor-attach rules.
+    /// </summary>
     public class MyGridLayer : RasterLayer, ISteppedActiveLayer
     {
+        /// <summary>Enable/disable visualization mode (forwarded by config).</summary>
         [PropertyDescription] public bool Visualization { get; set; }
+
+        /// <summary>Wait time between sending and client ACK checks.</summary>
         [PropertyDescription] public int VisualizationTimeout { get; set; }
+
+        /// <summary>Number of ticks that make up one in-game second.</summary>
         [PropertyDescription] public int TicksPerSecondDivisor { get; set; } = 3; // “every 3 ticks is one second”
+
+        /// <summary>
+        /// Semicolon-separated list of CSV grid files representing levels (1-based index).
+        /// </summary>
         [PropertyDescription] public string LevelFilesCsv { get; set; } = "Resources/level1Grid.csv";
 
+        // Agent collections (spawned at init)
         public List<CarAgent> Cars = new();
         public List<TruckAgent> Trucks = new();
         public List<TurtleAgent> Turtles = new();
@@ -29,30 +43,32 @@ namespace frogger_mars.Model
         private readonly DataVisualizationServer _dataVisualizationServer = new();
 
         private List<FrogAgent> _frogs;
+        /// <summary>The frog actively controlled by the client.</summary>
         public FrogAgent ActiveFrog;
+
         private Position _frogStart;
         private int _lives = 5;
         private int _startLives = 5;
         private bool _gameOver = false;
 
-        // Snapshots
+        // Snapshots for previous tick (used by conveyor & wrap detection)
         private Position _lastFrogPos;
         private readonly Dictionary<int, Position> _lastLogPos = new();
-
         private readonly Dictionary<int, Position> _lastTurtlePos = new();
 
-        // pro Row -> prevX -> exakter dx dieses Ticks (kann -2, -1, 0, +1, +2 sein)
+        // Per-row mapping: prevX -> exact dx this tick (after optional clamp)
         private readonly Dictionary<int, Dictionary<int, int>> _dxByRowPrevX = new();
 
-        // Fallback, falls exakte prevX nicht gefunden: Median der dx in der Row
+        // Row-level fallback if a precise prevX is missing (median of dx samples)
         private readonly Dictionary<int, int> _rowFallbackDx = new();
 
-        // welche prevX (pro Row) gehören zu Turtles, die JETZT hidden sind (für Sofort-Tod)
+        // For turtles that just became hidden in this tick (instant death zones)
         private readonly Dictionary<int, HashSet<int>> _turtleHiddenNow = new();
 
-
-        // Conveyor-Lanes: pro Y-Reihe -> Set<X> der Plattformkacheln aus T-1 und Delta -1/0/+1 in T
+        // Conveyor lanes: per Y row -> set of platform tiles from T-1
         private readonly Dictionary<int, HashSet<int>> _platformsPrevByRow = new();
+
+        // Currently unused but kept for clarity if per-lane deltas are needed later
         private readonly Dictionary<int, int> _laneDeltaByRow = new();
 
         private const int CARRY_DX_CLAMP = 1;
@@ -74,9 +90,9 @@ namespace frogger_mars.Model
             public List<Position> Pads = new();
         }
 
-        private readonly Dictionary<int, LevelLayout> _levelLayouts = new(); // 1-basiert
+        private readonly Dictionary<int, LevelLayout> _levelLayouts = new(); // 1-based level index
 
-        // --- Pfadauflösung ---
+        // --- Path resolving for relative CSV files ---
         private static string ResolvePath(string p)
         {
             if (string.IsNullOrWhiteSpace(p)) return p;
@@ -88,6 +104,10 @@ namespace frogger_mars.Model
             return cand2;
         }
 
+        /// <summary>
+        /// Parses a grid CSV file (top-down order) into a <see cref="LevelLayout"/>.
+        /// Supported tokens: 1=frog start, 2/3=trucks 0/180, 4/5=cars 0/180, 6=logs, 7=turtles, 8=pads.
+        /// </summary>
         private LevelLayout ParseGridCsv(string path)
         {
             var full = ResolvePath(path);
@@ -132,6 +152,9 @@ namespace frogger_mars.Model
             return layout;
         }
 
+        /// <summary>
+        /// Loads all configured level layouts into memory.
+        /// </summary>
         private void LoadLevelLayouts()
         {
             _levelLayouts.Clear();
@@ -147,6 +170,10 @@ namespace frogger_mars.Model
             }
         }
 
+        /// <summary>
+        /// Applies the given level layout to all agents (positions, headings) and resets snapshots.
+        /// Agents in excess are parked off-grid to keep ids stable.
+        /// </summary>
         private void ApplyLevel(int levelIndex)
         {
             if (!_levelLayouts.TryGetValue(levelIndex, out var L))
@@ -241,7 +268,7 @@ namespace frogger_mars.Model
                 Pads[i].OccupiedByFrogId = null;
             }
 
-            // Snapshots / Lane-Maps initialisieren
+            // Snapshots / lane maps
             _lastFrogPos = Position.CreatePosition(ActiveFrog.Position.X, ActiveFrog.Position.Y);
 
             _lastLogPos.Clear();
@@ -251,14 +278,17 @@ namespace frogger_mars.Model
             foreach (var tu in Turtles)
                 _lastTurtlePos[tu.AgentId] = Position.CreatePosition(tu.Position.X, tu.Position.Y);
 
-            RebuildPlatformsPrevMap(); // aus aktuellem Zustand
-            _laneDeltaByRow.Clear(); // noch kein Delta beim Levelstart
+            RebuildPlatformsPrevMap(); // based on current positions
+            _laneDeltaByRow.Clear(); // no delta at level start
 
             Console.WriteLine($"[Level] Applied layout {levelIndex}");
         }
 
         // ---------- Init / Loop ----------
 
+        /// <summary>
+        /// Creates agents, loads level layouts, applies initial level, binds the visualization server and starts it.
+        /// </summary>
         public override bool InitLayer(LayerInitData layerInitData, RegisterAgent registerAgentHandle,
             UnregisterAgent unregisterAgentHandle)
         {
@@ -272,7 +302,7 @@ namespace frogger_mars.Model
             Logs = agentManager.Spawn<LogAgent, MyGridLayer>().ToList();
             Pads = agentManager.Spawn<PadAgent, MyGridLayer>().ToList();
 
-            // IDs
+            // Assign stable ids across all agents for the renderer
             var id = 0;
             foreach (var f in _frogs) f.AgentId = id++;
             foreach (var c in Cars) c.AgentId = id++;
@@ -287,14 +317,14 @@ namespace frogger_mars.Model
             LoadLevelLayouts();
             ApplyLevel(Math.Max(1, _dataVisualizationServer.StartLevel));
 
-            // Timer/Leben
+            // Timer/lives
             _startTimeSeconds = _dataVisualizationServer.StartTimeSeconds;
             _timeLeft = _startTimeSeconds;
             _startLives = _dataVisualizationServer.StartLives;
             _lives = _startLives;
             _dataVisualizationServer.SetLives(_lives);
 
-            // Viz server binding
+            // Bind viz server references
             _dataVisualizationServer.Frog = ActiveFrog;
             _dataVisualizationServer.Cars = Cars;
             _dataVisualizationServer.Trucks = Trucks;
@@ -306,6 +336,10 @@ namespace frogger_mars.Model
             return true;
         }
 
+        /// <summary>
+        /// Blocks until the client has sent "start"; also respects pause/resume.
+        /// Resets the game state at each new start phase.
+        /// </summary>
         public void PreTick()
         {
             if (!_dataVisualizationServer.Started || _gameOver)
@@ -318,11 +352,15 @@ namespace frogger_mars.Model
                 _dataVisualizationServer.WaitWhilePaused();
         }
 
+        /// <summary>
+        /// Main per-tick update: computes conveyor motion, applies carry if conditions match,
+        /// checks water/pads/vehicles and updates timers. Snapshots are updated afterward.
+        /// </summary>
         public void Tick()
         {
             if (_gameOver || ActiveFrog == null) return;
 
-            // === 1) exakte Lane-Bewegung nur wenn Frosch NICHT die Row gewechselt hat ===
+            // 1) compute exact lane motion (dx) for rows based on T-1 -> T
             ComputeLaneMotionMaps();
 
             int yPrev = (int)_lastFrogPos.Y;
@@ -334,13 +372,13 @@ namespace frogger_mars.Model
                 _platformsPrevByRow.TryGetValue(yPrev, out var prevXs) &&
                 prevXs.Contains((int)_lastFrogPos.X);
 
-            // Carry nur, wenn gleiche Row & er stand in T-1 auf Plattform
+            // Carry only if same row and frog stood on a platform in T-1
             if (wasOnPrevPlatformSameRow)
             {
                 if (_dxByRowPrevX.TryGetValue(yPrev, out var map) &&
                     map.TryGetValue((int)_lastFrogPos.X, out var dx))
                 {
-                    // Turtle jetzt getaucht? -> sofort Tod
+                    // Turtle just dove? => instant death
                     if (_turtleHiddenNow.TryGetValue(yPrev, out var hiddenSet) &&
                         hiddenSet.Contains((int)_lastFrogPos.X))
                     {
@@ -355,7 +393,7 @@ namespace frogger_mars.Model
                         {
                             KillActiveFrog();
                             goto AFTER_MOVES;
-                        } // Rand=Tod
+                        } // Edge = death
 
                         ActiveFrog.Position = Position.CreatePosition(nx, yNow);
                     }
@@ -373,8 +411,8 @@ namespace frogger_mars.Model
                 }
             }
 
-            // === 2) Wasser/Pad/Collision ===
-            // Gnadenfrist: war er in T-1 auf Plattform derselben Row? Dann kein Wasser-Tod in DIESEM Tick
+            // 2) Water/Pad/Collision
+            // Grace: if the frog was on a platform on the same row in T-1, do not drown this tick.
             if (IsWaterTile(ActiveFrog.Position))
             {
                 if (!wasOnPrevPlatformSameRow)
@@ -382,7 +420,7 @@ namespace frogger_mars.Model
                     KillActiveFrog();
                     goto AFTER_MOVES;
                 }
-                // sonst: 1-Tick Grace — nix tun, er „schwimmt“ diesen Tick mit
+                // else: one-tick grace while being carried
             }
 
             var pad = Pads.FirstOrDefault(pd => pd.Position.Equals(ActiveFrog.Position));
@@ -412,14 +450,14 @@ namespace frogger_mars.Model
             }
 
             AFTER_MOVES:
-            // === 4) Timer ===
+            // 4) Timer
             if (Context.CurrentTick % TicksPerSecondDivisor == 0)
             {
                 if (_timeLeft > 0) _timeLeft--;
                 if (_timeLeft == 0) KillActiveFrog();
             }
 
-            // === 5) Snapshots & Plattform-Map für nächsten Tick ===
+            // 5) Snapshots & platform map for next tick
             _lastFrogPos = Position.CreatePosition(ActiveFrog.Position.X, ActiveFrog.Position.Y);
 
             _lastLogPos.Clear();
@@ -432,6 +470,9 @@ namespace frogger_mars.Model
             RebuildPlatformsPrevMap();
         }
 
+        /// <summary>
+        /// Sends the current state to the client and waits for the ACK tick to advance.
+        /// </summary>
         public void PostTick()
         {
             while (!_dataVisualizationServer.Connected())
@@ -445,6 +486,10 @@ namespace frogger_mars.Model
         }
 
         // ---------- Helpers ----------
+
+        /// <summary>
+        /// Decrements lives, resets the frog and signals game over if no lives remain.
+        /// </summary>
         private void KillActiveFrog()
         {
             _lives--;
@@ -461,6 +506,9 @@ namespace frogger_mars.Model
             }
         }
 
+        /// <summary>
+        /// Moves the frog back to the level spawn and resets jump counter and timer.
+        /// </summary>
         private void ResetActiveFrogToStart()
         {
             ActiveFrog.Position = _frogStart;
@@ -469,9 +517,12 @@ namespace frogger_mars.Model
             ResetTimer();
         }
 
+        /// <summary>
+        /// Returns true if a position is in the water rows and not on a platform/pad tile.
+        /// </summary>
         private bool IsWaterTile(Position pos)
         {
-            // Beispiel: Zeilen 0..6 sind Wasser
+            // Example: rows 0..6 are water
             if (pos.Y >= 0 && pos.Y <= 6)
             {
                 bool onPad = Pads.Any(pad => pad.Position.Equals(pos));
@@ -483,12 +534,18 @@ namespace frogger_mars.Model
             return false;
         }
 
+        /// <summary>
+        /// Returns true if a car or truck occupies the same tile.
+        /// </summary>
         private bool CollidesWithVehicle(Position p)
         {
             return Cars.Any(c => c.Position.Equals(p)) ||
                    Trucks.Any(t => t.Position.Equals(p));
         }
 
+        /// <summary>
+        /// Resets lives, timer, pads and applies the selected start level as chosen by the client.
+        /// </summary>
         private void ResetGameState()
         {
             ApplyLevel(Math.Max(1, _dataVisualizationServer.StartLevel));
@@ -513,9 +570,15 @@ namespace frogger_mars.Model
             _dataVisualizationServer.Frog = ActiveFrog;
         }
 
+        /// <summary>Resets the countdown timer to the configured start value.</summary>
         private void ResetTimer() => _timeLeft = _startTimeSeconds;
 
-        // === Conveyor-Berechnungen ===
+        // === Conveyor calculations ===
+
+        /// <summary>
+        /// Builds the set of platform tiles per row from the current (T) positions
+        /// to be used as "previous tiles" in the next tick.
+        /// </summary>
         private void RebuildPlatformsPrevMap()
         {
             _platformsPrevByRow.Clear();
@@ -535,7 +598,7 @@ namespace frogger_mars.Model
 
             foreach (var tu in Turtles)
             {
-                if (tu.Hidden) continue; // getauchte sind keine Plattform
+                if (tu.Hidden) continue; // hidden turtles are not platforms
                 int y = (int)tu.Position.Y;
                 int x = (int)tu.Position.X;
                 if (!_platformsPrevByRow.TryGetValue(y, out var set))
@@ -548,6 +611,10 @@ namespace frogger_mars.Model
             }
         }
 
+        /// <summary>
+        /// Computes per-row exact dx samples from previous snapshot to current state (with clamping).
+        /// Also tracks turtles that became hidden in this tick for instant-death handling.
+        /// </summary>
         private void ComputeLaneMotionMaps()
         {
             _dxByRowPrevX.Clear();
@@ -562,7 +629,7 @@ namespace frogger_mars.Model
                 if (!_lastLogPos.TryGetValue(lg.AgentId, out var prev)) continue;
 
                 int yPrev = (int)prev.Y;
-                int rawDx = TorusDelta((int)prev.X, (int)lg.Position.X, Width); // echter dx inkl. Wrap
+                int rawDx = TorusDelta((int)prev.X, (int)lg.Position.X, Width); // true dx incl. wrap
                 int dx = Math.Clamp(rawDx, -CARRY_DX_CLAMP, CARRY_DX_CLAMP);
 
                 if (dx != 0)
@@ -625,7 +692,7 @@ namespace frogger_mars.Model
                 }
             }
 
-            // Fallback: Median der (schon) geklemmten dx
+            // Fallback: median dx per row
             foreach (var kv in samplesByRow)
             {
                 var list = kv.Value;
@@ -635,7 +702,9 @@ namespace frogger_mars.Model
             }
         }
 
-
+        /// <summary>
+        /// Returns the shortest horizontal delta on a torus (wrap-aware).
+        /// </summary>
         private static int TorusDelta(int prevX, int curX, int width)
         {
             int dx = curX - prevX;
