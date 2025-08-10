@@ -27,6 +27,13 @@ public class DataVisualizationServer
     private int  _lastInputTick = -1;           // legacy guard (belassen)
     private bool _acceptedInputThisTick = false; // NEW: hartes „nur 1 Input pro Tick“
 
+    
+    // --- Time ---
+    private int _timeLeft = 0;                 // shown to Godot
+    public  int StartTimeSeconds { get; private set; } = 60; // adjustable from Godot
+
+    public void SetTimeLeft(int v) => _timeLeft = Math.Max(0, v);
+    
     // --- Start-Gate ---
     private readonly ManualResetEventSlim _startGate = new(false);
     public bool Started => _startGate.IsSet;
@@ -46,11 +53,14 @@ public class DataVisualizationServer
     // --- UI-State ---
     private readonly List<int> _removeIds = new();
     private int _lives = 5;
-    private bool _gameOverFlag = false;
 
     public void EnqueueRemoval(int id) { lock (_removeIds) _removeIds.Add(id); }
     public void SetLives(int v) => _lives = v;
+    private bool _gameOverFlag = false;
+    private bool _gameWonFlag = false;
     public void SetGameOver(bool v) => _gameOverFlag = v;
+    public void SetGameWon(bool v)  => _gameWonFlag  = v;
+
     public void ClearPendingRemovals(){ lock (_removeIds) _removeIds.Clear(); }
 
     public void Start()
@@ -116,8 +126,17 @@ public class DataVisualizationServer
 
                                 case "restart":
                                     _gameOverFlag = false;
+                                    _gameWonFlag  = false; 
                                     ResetStartGate(); // PreTick blockt wieder
                                     Console.WriteLine("[Viz] RESTART requested");
+                                    return;
+                                case "set_start_time":
+                                    if (json.TryGetValue("value", out var v) && v.ValueKind == JsonValueKind.Number)
+                                    {
+                                        var seconds = Math.Clamp(v.GetInt32(), 1, 999);
+                                        StartTimeSeconds = seconds;
+                                        Console.WriteLine($"[Viz] Start time set to {StartTimeSeconds}s");
+                                    }
                                     return;
                             }
                         }
@@ -243,15 +262,19 @@ public class DataVisualizationServer
 
         int[] removeIds;
         lock (_removeIds){ removeIds = _removeIds.ToArray(); _removeIds.Clear(); }
-
+        
         var payload = new
         {
             expectingTick = CurrentTick + 1,
             lives = _lives,
+            timeLeft = _timeLeft,           
             gameOver = _gameOverFlag,
+            gameWon  = _gameWonFlag,
             removeIds,
             agents = list
         };
+
+
 
         _lastMessage = JsonSerializer.Serialize(payload);
         Console.WriteLine($"[WS] Sending data: {_lastMessage}");

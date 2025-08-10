@@ -15,6 +15,10 @@
         {
           "parameter": "VisualizationTimeout",
           "value": 180
+        },
+        {
+          "parameter": "TicksPerSecondDivisor",
+          "value": 5
         }
       ]
     }

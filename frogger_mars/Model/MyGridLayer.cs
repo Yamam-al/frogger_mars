@@ -34,6 +34,12 @@ namespace frogger_mars.Model
         private Dictionary<int, Position> _lastLogPos = new();
         private Dictionary<int, Position> _lastTurtlePos = new();
         private Position _lastFrogPos;
+        
+        // Time
+        [PropertyDescription] public int TicksPerSecondDivisor { get; set; } = 3; // “every 3 ticks is one second”
+        private int _startTimeSeconds = 60;
+        private int _timeLeft;
+
 
         public override bool InitLayer(LayerInitData layerInitData, RegisterAgent registerAgentHandle,
             UnregisterAgent unregisterAgentHandle)
@@ -160,6 +166,11 @@ namespace frogger_mars.Model
             _lastTurtlePos.Clear();
             foreach (var tu in Turtles) _lastTurtlePos[tu.AgentId] = Position.CreatePosition(tu.Position.X, tu.Position.Y);
 
+            
+            
+            if (TicksPerSecondDivisor <= 0) TicksPerSecondDivisor = 3;
+
+            
             // Viz server
             _dataVisualizationServer.Frog    = ActiveFrog;
             _dataVisualizationServer.Cars    = Cars;
@@ -167,6 +178,8 @@ namespace frogger_mars.Model
             _dataVisualizationServer.Logs    = Logs;
             _dataVisualizationServer.Turtles = Turtles;
             _dataVisualizationServer.Pads    = Pads;
+            _startTimeSeconds = _dataVisualizationServer.StartTimeSeconds; // in case Godot set it before Start
+            _timeLeft = _startTimeSeconds;
             _dataVisualizationServer.RunInBackground();
 
             return true;
@@ -194,6 +207,19 @@ namespace frogger_mars.Model
         {
             if (_gameOver || ActiveFrog == null) return;
 
+            // === TIMER ===
+            if (Context.CurrentTick % TicksPerSecondDivisor == 0)
+            {
+                if (_timeLeft > 0) _timeLeft--;
+                if (_timeLeft == 0)
+                {
+                    Console.WriteLine("[Timer] Time out → lose 1 life");
+                    KillActiveFrog();         // behaves like a death
+                    // KillActiveFrog() will reset timer or end the game
+                    return;                   // stop rest of Tick for this step
+                }
+            }
+            
             // ===== 1) Plattform-Mittragen (robust per int-Δ, kein Frog-Wrap; Rand = Tod) =====
             bool carried = false;
 
@@ -310,6 +336,7 @@ namespace frogger_mars.Model
                         {
                             _gameOver = true; // treat as win
                             _dataVisualizationServer.SetGameOver(true);
+                            _dataVisualizationServer.SetGameWon(true);
                             _dataVisualizationServer.Frog = null;
                             _dataVisualizationServer.ResetStartGate();
                         }
@@ -345,6 +372,7 @@ namespace frogger_mars.Model
                 Thread.Sleep(1000);
 
             Console.WriteLine($"[Viz] Sending data for tick {Context.CurrentTick}");
+            _dataVisualizationServer.SetTimeLeft(_timeLeft);
             _dataVisualizationServer.SendData();
 
             while (_dataVisualizationServer.CurrentTick != Context.CurrentTick + 1)
@@ -367,6 +395,7 @@ namespace frogger_mars.Model
                 Console.WriteLine("[Game] No lives left — game over!");
                 _gameOver = true;
 
+                _dataVisualizationServer.SetGameWon(false);
                 _dataVisualizationServer.SetGameOver(true);
                 _dataVisualizationServer.Frog = null;
                 _dataVisualizationServer.ResetStartGate();
@@ -378,6 +407,8 @@ namespace frogger_mars.Model
             ActiveFrog.Position = _frogStart;
             _lastFrogPos = Position.CreatePosition(ActiveFrog.Position.X, ActiveFrog.Position.Y);
             ActiveFrog.Jumps = 0;
+            ResetTimer();
+
         }
 
         private bool IsWaterTile(Position pos)
@@ -403,6 +434,9 @@ namespace frogger_mars.Model
         private void ResetGameState()
         {
             Console.WriteLine("[Game] ResetGameState()");
+            
+            _startTimeSeconds = _dataVisualizationServer.StartTimeSeconds; // re-read may have changed
+            ResetTimer();
 
             _lives = 5;
             _gameOver = false;
@@ -428,8 +462,11 @@ namespace frogger_mars.Model
 
             _dataVisualizationServer.ClearPendingRemovals();
             _dataVisualizationServer.SetGameOver(false);
+            _dataVisualizationServer.SetGameWon(false); 
             _dataVisualizationServer.SetLives(_lives);
             _dataVisualizationServer.Frog = ActiveFrog;
         }
+        private void ResetTimer() => _timeLeft = _startTimeSeconds;
+
     }
 }
