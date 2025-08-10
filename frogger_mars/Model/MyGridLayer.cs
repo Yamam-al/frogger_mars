@@ -28,6 +28,7 @@ namespace frogger_mars.Model
         public FrogAgent ActiveFrog;
         private Position _frogStart;
         private int _lives = 5;
+        private int _startLives = 5; // NEW: wird aus DataVisualizationServer übernommen
         private bool _gameOver = false;
 
         // Vorherige Positionen aus Tick T-1:
@@ -180,6 +181,9 @@ namespace frogger_mars.Model
             _dataVisualizationServer.Pads    = Pads;
             _startTimeSeconds = _dataVisualizationServer.StartTimeSeconds; // in case Godot set it before Start
             _timeLeft = _startTimeSeconds;
+            _startLives = _dataVisualizationServer.StartLives; // NEW
+            _lives = _startLives;
+            _dataVisualizationServer.SetLives(_lives);         // UI sync
             _dataVisualizationServer.RunInBackground();
 
             return true;
@@ -438,8 +442,10 @@ namespace frogger_mars.Model
             _startTimeSeconds = _dataVisualizationServer.StartTimeSeconds; // re-read may have changed
             ResetTimer();
 
-            _lives = 5;
+            _startLives = _dataVisualizationServer.StartLives; // 
+            _lives = _startLives;
             _gameOver = false;
+
 
             // Pads freigeben
             foreach (var pd in Pads)

@@ -53,6 +53,10 @@ public class DataVisualizationServer
     // --- UI-State ---
     private readonly List<int> _removeIds = new();
     private int _lives = 5;
+    
+    // --- Lives ---
+    public int StartLives { get; private set; } = 5; // adjustable from Godot
+
 
     public void EnqueueRemoval(int id) { lock (_removeIds) _removeIds.Add(id); }
     public void SetLives(int v) => _lives = v;
@@ -129,6 +133,7 @@ public class DataVisualizationServer
                                     _gameWonFlag  = false; 
                                     ResetStartGate(); // PreTick blockt wieder
                                     Console.WriteLine("[Viz] RESTART requested");
+                                    SetLives(StartLives);
                                     return;
                                 case "set_start_time":
                                     if (json.TryGetValue("value", out var v) && v.ValueKind == JsonValueKind.Number)
@@ -138,6 +143,17 @@ public class DataVisualizationServer
                                         Console.WriteLine($"[Viz] Start time set to {StartTimeSeconds}s");
                                     }
                                     return;
+                                case "set_start_lives":
+                                    if (json.TryGetValue("value", out var liv) && liv.ValueKind == JsonValueKind.Number)
+                                    {
+                                        var lives = Math.Clamp(liv.GetInt32(), 1, 99);
+                                        StartLives = lives;
+                                        // optional: sofort an UI spiegeln
+                                        SetLives(StartLives);
+                                        Console.WriteLine($"[Viz] Start lives set to {StartLives}");
+                                    }
+                                    return;
+
                             }
                         }
 
