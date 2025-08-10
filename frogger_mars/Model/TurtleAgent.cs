@@ -26,9 +26,9 @@ public class TurtleAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
     private void MoveForward()
     {
         Position.X--;
-        if (Position.X <= 0)
+        if (Position.X < 0)
         {
-            Position.X = Layer.Width;
+            Position.X = Layer.Width -1;
         }   
     }
     

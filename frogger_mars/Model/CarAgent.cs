@@ -35,9 +35,9 @@ public class CarAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
         else
         {
             Position.X--;
-            if (Position.X <= 0)
+            if (Position.X < 0)
             {
-                Position.X = Layer.Width;
+                Position.X = Layer.Width +1 ;
             }       
         }
     }
