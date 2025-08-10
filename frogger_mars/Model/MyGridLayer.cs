@@ -35,28 +35,27 @@ namespace frogger_mars.Model
         private Dictionary<int, Position> _lastTurtlePos = new();
         private Position _lastFrogPos;
 
-
         public override bool InitLayer(LayerInitData layerInitData, RegisterAgent registerAgentHandle,
             UnregisterAgent unregisterAgentHandle)
         {
             base.InitLayer(layerInitData, registerAgentHandle, unregisterAgentHandle);
 
             var agentManager = layerInitData.Container.Resolve<IAgentManager>();
-            _frogs = agentManager.Spawn<FrogAgent, MyGridLayer>().ToList();
-            Cars = agentManager.Spawn<CarAgent, MyGridLayer>().ToList();
-            Trucks = agentManager.Spawn<TruckAgent, MyGridLayer>().ToList();
-            Turtles = agentManager.Spawn<TurtleAgent, MyGridLayer>().ToList();
-            Logs = agentManager.Spawn<LogAgent, MyGridLayer>().ToList();
-            Pads = agentManager.Spawn<PadAgent, MyGridLayer>().ToList();
+            _frogs   = agentManager.Spawn<FrogAgent, MyGridLayer>().ToList();
+            Cars     = agentManager.Spawn<CarAgent, MyGridLayer>().ToList();
+            Trucks   = agentManager.Spawn<TruckAgent, MyGridLayer>().ToList();
+            Turtles  = agentManager.Spawn<TurtleAgent, MyGridLayer>().ToList();
+            Logs     = agentManager.Spawn<LogAgent, MyGridLayer>().ToList();
+            Pads     = agentManager.Spawn<PadAgent, MyGridLayer>().ToList();
 
             // IDs
             var id = 0;
-            foreach (var f in _frogs) f.AgentId = id++;
-            foreach (var c in Cars) c.AgentId = id++;
-            foreach (var t in Trucks) t.AgentId = id++;
-            foreach (var tu in Turtles) tu.AgentId = id++;
-            foreach (var lg in Logs) lg.AgentId = id++;
-            foreach (var p in Pads) p.AgentId = id++;
+            foreach (var f in _frogs)    f.AgentId = id++;
+            foreach (var c in Cars)      c.AgentId = id++;
+            foreach (var t in Trucks)    t.AgentId = id++;
+            foreach (var tu in Turtles)  tu.AgentId = id++;
+            foreach (var lg in Logs)     lg.AgentId = id++;
+            foreach (var p in Pads)      p.AgentId = id++;
 
             Console.WriteLine($"We created {_frogs.Count} frog agents.");
             Console.WriteLine($"We created {Cars.Count} car agents.");
@@ -68,14 +67,14 @@ namespace frogger_mars.Model
             ActiveFrog = _frogs.First(); // nur der erste ist aktiv
 
             // Grid lesen
-            var frogPlaced = false;
-            var carSpots0 = new List<Position>();
-            var carSpots180 = new List<Position>();
-            var truckSpots0 = new List<Position>();
-            var truckSpots180 = new List<Position>();
-            var turtleSpots = new List<Position>();
-            var logSpots = new List<Position>();
-            var padSpots = new List<Position>();
+            var frogPlaced   = false;
+            var carSpots0    = new List<Position>();
+            var carSpots180  = new List<Position>();
+            var truckSpots0  = new List<Position>();
+            var truckSpots180= new List<Position>();
+            var turtleSpots  = new List<Position>();
+            var logSpots     = new List<Position>();
+            var padSpots     = new List<Position>();
 
             for (var y = 0; y < Height; y++)
             for (var x = 0; x < Width; x++)
@@ -91,7 +90,6 @@ namespace frogger_mars.Model
                             frogPlaced = true;
                             Console.WriteLine($"Frog start position set to: ({x}, {y})");
                         }
-
                         break;
                     case 2.0: truckSpots0.Add(Position.CreatePosition(x, y)); break;
                     case 3.0: truckSpots180.Add(Position.CreatePosition(x, y)); break;
@@ -108,17 +106,12 @@ namespace frogger_mars.Model
             foreach (var p in carSpots0)
             {
                 if (ci >= Cars.Count) break;
-                Cars[ci].Position = p;
-                Cars[ci].Heading = 90;
-                ci++;
+                Cars[ci].Position = p; Cars[ci].Heading = 90; ci++;
             }
-
             foreach (var p in carSpots180)
             {
                 if (ci >= Cars.Count) break;
-                Cars[ci].Position = p;
-                Cars[ci].Heading = -90;
-                ci++;
+                Cars[ci].Position = p; Cars[ci].Heading = -90; ci++;
             }
 
             // assign trucks
@@ -126,17 +119,12 @@ namespace frogger_mars.Model
             foreach (var p in truckSpots0)
             {
                 if (ti >= Trucks.Count) break;
-                Trucks[ti].Position = p;
-                Trucks[ti].Heading = 0;
-                ti++;
+                Trucks[ti].Position = p; Trucks[ti].Heading = 0; ti++;
             }
-
             foreach (var p in truckSpots180)
             {
                 if (ti >= Trucks.Count) break;
-                Trucks[ti].Position = p;
-                Trucks[ti].Heading = 180;
-                ti++;
+                Trucks[ti].Position = p; Trucks[ti].Heading = 180; ti++;
             }
 
             // assign logs
@@ -144,8 +132,7 @@ namespace frogger_mars.Model
             foreach (var p in logSpots)
             {
                 if (li >= Logs.Count) break;
-                Logs[li].Position = p;
-                li++;
+                Logs[li].Position = p; li++;
             }
 
             // assign turtles
@@ -153,8 +140,7 @@ namespace frogger_mars.Model
             foreach (var p in turtleSpots)
             {
                 if (tri >= Turtles.Count) break;
-                Turtles[tri].Position = p;
-                tri++;
+                Turtles[tri].Position = p; tri++;
             }
 
             // assign pads
@@ -162,34 +148,25 @@ namespace frogger_mars.Model
             foreach (var p in padSpots)
             {
                 if (pi >= Pads.Count) break;
-                Pads[pi].Position = p;
-                Pads[pi].Occupied = false;
-                Pads[pi].OccupiedByFrogId = null;
-                pi++;
+                Pads[pi].Position = p; Pads[pi].Occupied = false; Pads[pi].OccupiedByFrogId = null; pi++;
             }
 
-            Console.WriteLine(
-                $"Placed {ci}/{Cars.Count} cars, {ti}/{Trucks.Count} trucks, {li}/{Logs.Count} logs, {tri}/{Turtles.Count} turtles and {pi}/{Pads.Count} pads, from grid.");
+            Console.WriteLine($"Placed {ci}/{Cars.Count} cars, {ti}/{Trucks.Count} trucks, {li}/{Logs.Count} logs, {tri}/{Turtles.Count} turtles and {pi}/{Pads.Count} pads, from grid.");
 
-
+            // last-Positions initialisieren
             _lastFrogPos = Position.CreatePosition(ActiveFrog.Position.X, ActiveFrog.Position.Y);
-
             _lastLogPos.Clear();
-            foreach (var lg in Logs)
-                _lastLogPos[lg.AgentId] = Position.CreatePosition(lg.Position.X, lg.Position.Y);
-
+            foreach (var lg in Logs) _lastLogPos[lg.AgentId] = Position.CreatePosition(lg.Position.X, lg.Position.Y);
             _lastTurtlePos.Clear();
-            foreach (var tu in Turtles)
-                _lastTurtlePos[tu.AgentId] = Position.CreatePosition(tu.Position.X, tu.Position.Y);
-
+            foreach (var tu in Turtles) _lastTurtlePos[tu.AgentId] = Position.CreatePosition(tu.Position.X, tu.Position.Y);
 
             // Viz server
-            _dataVisualizationServer.Frog = ActiveFrog;
-            _dataVisualizationServer.Cars = Cars;
-            _dataVisualizationServer.Trucks = Trucks;
-            _dataVisualizationServer.Logs = Logs;
+            _dataVisualizationServer.Frog    = ActiveFrog;
+            _dataVisualizationServer.Cars    = Cars;
+            _dataVisualizationServer.Trucks  = Trucks;
+            _dataVisualizationServer.Logs    = Logs;
             _dataVisualizationServer.Turtles = Turtles;
-            _dataVisualizationServer.Pads = Pads;
+            _dataVisualizationServer.Pads    = Pads;
             _dataVisualizationServer.RunInBackground();
 
             return true;
@@ -217,7 +194,7 @@ namespace frogger_mars.Model
         {
             if (_gameOver || ActiveFrog == null) return;
 
-            // ===== 1) Frog ggf. mit Plattform mitnehmen (robust per Δ, ohne Wrap; Rand = Tod) =====
+            // ===== 1) Plattform-Mittragen (robust per int-Δ, kein Frog-Wrap; Rand = Tod) =====
             bool carried = false;
 
             // --- Logs (rechts) ---
@@ -225,23 +202,26 @@ namespace frogger_mars.Model
             {
                 if (!_lastLogPos.TryGetValue(lg.AgentId, out var prev)) continue;
 
-                // Steht der Frog auf der aktuellen oder der vorherigen Log-Zelle?
-                bool onPrevNow = prev.Equals(ActiveFrog.Position);
-                bool onCurrent = lg.Position.Equals(ActiveFrog.Position);
+                int frogX = (int)ActiveFrog.Position.X;
+                int frogY = (int)ActiveFrog.Position.Y;
 
-                if (onPrevNow || onCurrent)
+                int curX  = (int)lg.Position.X;
+                int curY  = (int)lg.Position.Y;
+                int prevX = (int)prev.X;
+                int prevY = (int)prev.Y;
+
+                bool onPrev   = (frogX == prevX && frogY == prevY);
+                bool onCur    = (frogX == curX  && frogY == curY);
+
+                if (onPrev || onCur)
                 {
-                    int curX = (int)lg.Position.X;
-                    int prevX = (int)prev.X;
-
-                    // ΔX der Plattform (mit Wrap-Korrektur auf ±1)
                     int dx = curX - prevX;
-                    if (dx > 1) dx = -1; // z. B. 0 - (Width-1) => +1 Bewegung nach rechts
-                    if (dx < -1) dx = 1;
+                    if (dx > 1)  dx = -1; // Wrap-Korrektur auf ±1
+                    if (dx < -1) dx =  1;
 
                     if (dx != 0)
                     {
-                        int nx = (int)ActiveFrog.Position.X + dx;
+                        int nx = frogX + dx;
 
                         // Kein Wrap beim Frog: Rand = Tod
                         if (nx < 0 || nx >= Width)
@@ -250,11 +230,11 @@ namespace frogger_mars.Model
                             goto UPDATE_LAST;
                         }
 
-                        ActiveFrog.Position = Position.CreatePosition(nx, ActiveFrog.Position.Y);
+                        ActiveFrog.Position = Position.CreatePosition(nx, frogY);
                     }
 
                     carried = true;
-                    break; // eine Log reicht
+                    break;
                 }
             }
 
@@ -265,54 +245,56 @@ namespace frogger_mars.Model
                 {
                     if (!_lastTurtlePos.TryGetValue(tu.AgentId, out var prev)) continue;
 
-                    bool onPrevNow = prev.Equals(ActiveFrog.Position);
-                    bool onCurrent = tu.Position.Equals(ActiveFrog.Position);
+                    int frogX = (int)ActiveFrog.Position.X;
+                    int frogY = (int)ActiveFrog.Position.Y;
 
-                    if (onPrevNow || onCurrent)
+                    int curX  = (int)tu.Position.X;
+                    int curY  = (int)tu.Position.Y;
+                    int prevX = (int)prev.X;
+                    int prevY = (int)prev.Y;
+
+                    bool onPrev = (frogX == prevX && frogY == prevY);
+                    bool onCur  = (frogX == curX  && frogY == curY);
+
+                    if (onPrev || onCur)
                     {
-                        // Abtauchen -> sofort tot (auch wenn wir „drauf sind“)
                         if (tu.Hidden)
                         {
                             KillActiveFrog();
                             goto UPDATE_LAST;
                         }
 
-                        int curX = (int)tu.Position.X;
-                        int prevX = (int)prev.X;
-
                         int dx = curX - prevX;
-                        if (dx > 1) dx = -1; // Wrap-Korrektur auf ±1
-                        if (dx < -1) dx = 1;
+                        if (dx > 1)  dx = -1; // Wrap-Korrektur auf ±1
+                        if (dx < -1) dx =  1;
 
                         if (dx != 0)
                         {
-                            int nx = (int)ActiveFrog.Position.X + dx;
+                            int nx = frogX + dx;
 
-                            // Kein Wrap beim Frog: Rand = Tod
                             if (nx < 0 || nx >= Width)
                             {
                                 KillActiveFrog();
                                 goto UPDATE_LAST;
                             }
 
-                            ActiveFrog.Position = Position.CreatePosition(nx, ActiveFrog.Position.Y);
+                            ActiveFrog.Position = Position.CreatePosition(nx, frogY);
                         }
 
                         carried = true;
-                        break; // eine Turtle reicht
+                        break;
                     }
                 }
             }
 
             // ===== 2) Wasser-Check (erst NACH dem Mittragen!) =====
-            // Wenn wir nicht getragen wurden und im Wasserbereich sind -> tot
             if (!carried && IsWaterTile(ActiveFrog.Position))
             {
                 KillActiveFrog();
                 goto UPDATE_LAST;
             }
 
-            // ===== 3) Pad-Landung: Pad besetzen, Frog zurück zum Start (kein Leben verlieren) =====
+            // ===== 3) Pad-Landung =====
             {
                 var pad = Pads.FirstOrDefault(pd => pd.Position.Equals(ActiveFrog.Position));
                 if (pad != null)
@@ -322,18 +304,16 @@ namespace frogger_mars.Model
                         pad.Occupied = true;
                         pad.OccupiedByFrogId = ActiveFrog.AgentId;
 
-                        ResetActiveFrogToStart(); // setzt Position & Jumps = 0
+                        ResetActiveFrogToStart(); // Position & Jumps = 0
 
-                        // Win: alle Pads belegt?
                         if (Pads.All(pd => pd.Occupied))
                         {
-                            _gameOver = true; // Win über gleichen Kanal
+                            _gameOver = true; // treat as win
                             _dataVisualizationServer.SetGameOver(true);
                             _dataVisualizationServer.Frog = null;
                             _dataVisualizationServer.ResetStartGate();
                         }
                     }
-
                     goto UPDATE_LAST;
                 }
             }
@@ -342,11 +322,11 @@ namespace frogger_mars.Model
             if (CollidesWithVehicle(ActiveFrog.Position))
             {
                 KillActiveFrog();
-                // danach UPDATE_LAST
+                // weiter zu UPDATE_LAST
             }
 
-            UPDATE_LAST:
-            // ===== 5) Tick-Ende: „Last“-Positionen für T+1 aktualisieren =====
+        UPDATE_LAST:
+            // ===== 5) Tick-Ende: „Last“-Positionen für T+1 =====
             _lastFrogPos = Position.CreatePosition(ActiveFrog.Position.X, ActiveFrog.Position.Y);
 
             _lastLogPos.Clear();
@@ -357,7 +337,6 @@ namespace frogger_mars.Model
             foreach (var tu in Turtles)
                 _lastTurtlePos[tu.AgentId] = Position.CreatePosition(tu.Position.X, tu.Position.Y);
         }
-
 
         public void PostTick()
         {
@@ -373,25 +352,6 @@ namespace frogger_mars.Model
         }
 
         // ---------- Helpers ----------
-
-        private void CarryFrogWithLog()
-        {
-            // Log bewegt sich alle 2 Ticks nach rechts (Tick 2,4,6,...) -> Frog folgt dann mit
-            if (Context.CurrentTick % 2 == 0)
-            {
-                var x = ActiveFrog.Position.X + 1;
-                if (x >= Width) x = 0;
-                ActiveFrog.Position = Position.CreatePosition(x, ActiveFrog.Position.Y);
-            }
-        }
-
-        private void CarryFrogWithTurtle()
-        {
-            // Turtle bewegt sich jeden Tick nach links
-            var x = ActiveFrog.Position.X - 1;
-            if (x < 0) x = Width - 1;
-            ActiveFrog.Position = Position.CreatePosition(x, ActiveFrog.Position.Y);
-        }
 
         private void KillActiveFrog()
         {
@@ -425,12 +385,11 @@ namespace frogger_mars.Model
             // Wasserbereich (Y-Zeilen) je nach Level anpassen – hier Beispiel: 0..6
             if (pos.Y >= 0 && pos.Y <= 6)
             {
-                bool onLog = Logs.Any(log => log.Position.Equals(pos));
+                bool onLog    = Logs.Any(log => log.Position.Equals(pos));
                 bool onTurtle = Turtles.Any(tut => tut.Position.Equals(pos));
-                bool onPad = Pads.Any(pad => pad.Position.Equals(pos));
+                bool onPad    = Pads.Any(pad => pad.Position.Equals(pos));
                 return !onLog && !onTurtle && !onPad;
             }
-
             return false;
         }
 
@@ -460,17 +419,12 @@ namespace frogger_mars.Model
             ActiveFrog.Position = _frogStart;
             ActiveFrog.Jumps = 0;
 
-            // … nachdem ActiveFrog.Position gesetzt ist:
+            // last-Positions
             _lastFrogPos = Position.CreatePosition(ActiveFrog.Position.X, ActiveFrog.Position.Y);
-
             _lastLogPos.Clear();
-            foreach (var lg in Logs)
-                _lastLogPos[lg.AgentId] = Position.CreatePosition(lg.Position.X, lg.Position.Y);
-
+            foreach (var lg in Logs) _lastLogPos[lg.AgentId] = Position.CreatePosition(lg.Position.X, lg.Position.Y);
             _lastTurtlePos.Clear();
-            foreach (var tu in Turtles)
-                _lastTurtlePos[tu.AgentId] = Position.CreatePosition(tu.Position.X, tu.Position.Y);
-
+            foreach (var tu in Turtles) _lastTurtlePos[tu.AgentId] = Position.CreatePosition(tu.Position.X, tu.Position.Y);
 
             _dataVisualizationServer.ClearPendingRemovals();
             _dataVisualizationServer.SetGameOver(false);

@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
@@ -23,7 +23,9 @@ public class DataVisualizationServer
     public List<TurtleAgent> Turtles { set; get; }
     public List<PadAgent> Pads { set; get; }
 
-    private int _lastInputTick = -1;
+    // --- Anti-double-input Guards ---
+    private int  _lastInputTick = -1;           // legacy guard (belassen)
+    private bool _acceptedInputThisTick = false; // NEW: hartes „nur 1 Input pro Tick“
 
     // --- Start-Gate ---
     private readonly ManualResetEventSlim _startGate = new(false);
@@ -77,6 +79,8 @@ public class DataVisualizationServer
                             return;
                         }
                         CurrentTick = tick;
+                        // NEW: neuer Tick -> wieder genau 1 Input erlauben
+                        _acceptedInputThisTick = false;
                         return;
                     }
 
@@ -122,11 +126,20 @@ public class DataVisualizationServer
                         {
                             var direction = json["direction"].GetString();
 
-                            // one-input-per-tick guard (optional)
+                            // NEW: harte Sperre – nur 1 Input pro Tick
+                            if (_acceptedInputThisTick) return;
+
+                            // legacy guard (zusätzlich ok)
                             if (_lastInputTick == CurrentTick) return;
+
                             _lastInputTick = CurrentTick;
+                            _acceptedInputThisTick = true;
 
                             if (Frog == null) return;
+
+                            // Queue „entmüllen“: max. 1 Input im Puffer
+                            while (Frog.InputQueue.Count > 0) Frog.InputQueue.TryDequeue(out _);
+
                             switch (direction)
                             {
                                 case "up":    Frog.InputQueue.Enqueue(FrogInput.Up);    break;
