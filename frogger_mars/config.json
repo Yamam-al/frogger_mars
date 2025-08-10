@@ -19,6 +19,9 @@
         {
           "parameter": "TicksPerSecondDivisor",
           "value": 5
+        },
+        { "parameter": "LevelFilesCsv", 
+          "value": "Resources/level1Grid.csv;Resources/level2Grid.csv;Resources/level3Grid.csv;Resources/level4Grid.csv;Resources/level5Grid.csv"
         }
       ]
     }
@@ -30,11 +33,11 @@
     },
     {
       "name": "CarAgent",
-      "count": 4
+      "count": 22
     },
     {
       "name": "TruckAgent",
-      "count": 7
+      "count": 9
     },
     {
       "name": "LogAgent",
@@ -42,7 +45,7 @@
     },
     {
       "name": "TurtleAgent",
-      "count": 16
+      "count": 17
     },
     {
       "name": "PadAgent",

@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
@@ -24,16 +24,18 @@ public class DataVisualizationServer
     public List<PadAgent> Pads { set; get; }
 
     // --- Anti-double-input Guards ---
-    private int  _lastInputTick = -1;           // legacy guard (belassen)
-    private bool _acceptedInputThisTick = false; // NEW: hartes „nur 1 Input pro Tick“
+    private int  _lastInputTick = -1;            // legacy guard
+    private bool _acceptedInputThisTick = false; // nur 1 Input pro Tick
 
-    
     // --- Time ---
-    private int _timeLeft = 0;                 // shown to Godot
-    public  int StartTimeSeconds { get; private set; } = 60; // adjustable from Godot
-
+    private int _timeLeft = 0;                           // shown to Godot
+    public  int StartTimeSeconds { get; private set; } = 60; // setzbar aus Godot
     public void SetTimeLeft(int v) => _timeLeft = Math.Max(0, v);
-    
+
+    // --- Lives/Level ---
+    public int StartLives { get; private set; } = 5;     // setzbar aus Godot
+    public int StartLevel { get; private set; } = 1;     // setzbar aus Godot (1-basiert)
+
     // --- Start-Gate ---
     private readonly ManualResetEventSlim _startGate = new(false);
     public bool Started => _startGate.IsSet;
@@ -53,10 +55,6 @@ public class DataVisualizationServer
     // --- UI-State ---
     private readonly List<int> _removeIds = new();
     private int _lives = 5;
-    
-    // --- Lives ---
-    public int StartLives { get; private set; } = 5; // adjustable from Godot
-
 
     public void EnqueueRemoval(int id) { lock (_removeIds) _removeIds.Add(id); }
     public void SetLives(int v) => _lives = v;
@@ -93,8 +91,7 @@ public class DataVisualizationServer
                             return;
                         }
                         CurrentTick = tick;
-                        // NEW: neuer Tick -> wieder genau 1 Input erlauben
-                        _acceptedInputThisTick = false;
+                        _acceptedInputThisTick = false; // neuer Tick => wieder 1 Input erlaubt
                         return;
                     }
 
@@ -130,11 +127,13 @@ public class DataVisualizationServer
 
                                 case "restart":
                                     _gameOverFlag = false;
-                                    _gameWonFlag  = false; 
+                                    _gameWonFlag  = false;
                                     ResetStartGate(); // PreTick blockt wieder
                                     Console.WriteLine("[Viz] RESTART requested");
+                                    // Lives UI beim Restart auf StartLives spiegeln
                                     SetLives(StartLives);
                                     return;
+
                                 case "set_start_time":
                                     if (json.TryGetValue("value", out var v) && v.ValueKind == JsonValueKind.Number)
                                     {
@@ -143,17 +142,25 @@ public class DataVisualizationServer
                                         Console.WriteLine($"[Viz] Start time set to {StartTimeSeconds}s");
                                     }
                                     return;
+
                                 case "set_start_lives":
                                     if (json.TryGetValue("value", out var liv) && liv.ValueKind == JsonValueKind.Number)
                                     {
                                         var lives = Math.Clamp(liv.GetInt32(), 1, 99);
                                         StartLives = lives;
-                                        // optional: sofort an UI spiegeln
-                                        SetLives(StartLives);
+                                        SetLives(StartLives); // optional: direkt an UI spiegeln
                                         Console.WriteLine($"[Viz] Start lives set to {StartLives}");
                                     }
                                     return;
 
+                                case "set_start_level":
+                                    if (json.TryGetValue("value", out var lvl) && lvl.ValueKind == JsonValueKind.Number)
+                                    {
+                                        var level = Math.Clamp(lvl.GetInt32(), 1, 99);
+                                        StartLevel = level;
+                                        Console.WriteLine($"[Viz] Start level set to {StartLevel}");
+                                    }
+                                    return;
                             }
                         }
 
@@ -161,10 +168,8 @@ public class DataVisualizationServer
                         {
                             var direction = json["direction"].GetString();
 
-                            // NEW: harte Sperre – nur 1 Input pro Tick
+                            // nur 1 Input pro Tick
                             if (_acceptedInputThisTick) return;
-
-                            // legacy guard (zusätzlich ok)
                             if (_lastInputTick == CurrentTick) return;
 
                             _lastInputTick = CurrentTick;
@@ -172,7 +177,7 @@ public class DataVisualizationServer
 
                             if (Frog == null) return;
 
-                            // Queue „entmüllen“: max. 1 Input im Puffer
+                            // Queue entmüllen: max. 1 Input im Puffer
                             while (Frog.InputQueue.Count > 0) Frog.InputQueue.TryDequeue(out _);
 
                             switch (direction)
@@ -248,7 +253,6 @@ public class DataVisualizationServer
     {
         var list = new List<object>();
 
-        // Frog nur wenn vorhanden – inkl. Jumps
         if (Frog != null)
         {
             list.Add(new {
@@ -283,14 +287,12 @@ public class DataVisualizationServer
         {
             expectingTick = CurrentTick + 1,
             lives = _lives,
-            timeLeft = _timeLeft,           
+            timeLeft = _timeLeft,
             gameOver = _gameOverFlag,
             gameWon  = _gameWonFlag,
             removeIds,
             agents = list
         };
-
-
 
         _lastMessage = JsonSerializer.Serialize(payload);
         Console.WriteLine($"[WS] Sending data: {_lastMessage}");
