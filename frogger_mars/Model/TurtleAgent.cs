@@ -5,7 +5,7 @@ namespace frogger_mars.Model;
 public class TurtleAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
 {
     public bool Hidden = false;
-    private const int MovePeriod = 3;
+    private const int MovePeriod = 2;
 
     //  The Init() method is called by the agent manager after the agent is created.
     public void Init(MyGridLayer layer)

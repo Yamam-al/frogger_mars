@@ -4,7 +4,7 @@ namespace frogger_mars.Model;
 
 public class LogAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
 {
-    private const int MovePeriod = 3; // nur alle 3 Ticks
+    private const int MovePeriod = 2; // nur alle 3 Ticks
 
     //  The Init() method is called by the agent manager after the agent is created.
     public void Init(MyGridLayer layer)
