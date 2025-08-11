@@ -130,7 +130,6 @@ public class DataVisualizationServer
                 try
                 {
                     var s = message?.Trim();
-                    Console.WriteLine($"[WS] raw: {s}");
 
                     // 1) Bare/quoted number (ACK)
                     if (TryParseTick(s, out var tick))
@@ -370,7 +369,6 @@ public class DataVisualizationServer
         };
 
         _lastMessage = JsonSerializer.Serialize(payload);
-        Console.WriteLine($"[WS] Sending data: {_lastMessage}");
         _client?.Send(_lastMessage);
     }
 
