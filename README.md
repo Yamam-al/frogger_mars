@@ -6,7 +6,7 @@
 
 *Date: August 2025*
 
-*Repo: **[Github](https://github.com/Yamam-al/frogger_mars)**
+*Repo: **[Github](https://github.com/Yamam-al/frogger_mars)***
 
 This project implements the NetLogo model **“[Frogger](https://ccl.northwestern.edu/NetLogo/models/Frogger)”** in the **MARS** (Multi-Agent Research and Simulation) framework.
 
