@@ -12,7 +12,7 @@ This project implements the NetLogo model **“[Frogger](https://ccl.northwester
 
 The goal is to replicate the game logic and agent interactions of the original model as closely as possible and to verify, through simulation runs and parameter variation, that both models produce comparable results under the same conditions.
 
-The project was developed as part of the **Final Examination** in the elective module “K**I & Geoinformatik”** at **HAW Hamburg** (Summer 2025), supervised by **Prof. Dr. Thomas Clemen**.
+The project was developed as part of the **Final Examination** in the elective module **"KI & Geoinformatik”** at **HAW Hamburg** (Summer 2025), supervised by **Prof. Dr. Thomas Clemen**.
 
 ---
 
