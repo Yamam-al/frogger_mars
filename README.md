@@ -20,12 +20,12 @@ The project was developed as part of the **Final Examination** in the elective m
 
 ## **Table of Contents**
 
-1. [Project Overview](https://www.notion.so/Frogger-in-MARS-24c1bf2750c680118ddaf4f2371b1429?pvs=21)
-2. [Model Design](https://www.notion.so/Frogger-in-MARS-24c1bf2750c680118ddaf4f2371b1429?pvs=21)
-3. [Implementation Details](https://www.notion.so/Frogger-in-MARS-24c1bf2750c680118ddaf4f2371b1429?pvs=21)
-4. [Simulation & Usage](https://www.notion.so/Frogger-in-MARS-24c1bf2750c680118ddaf4f2371b1429?pvs=21)
-5. [Comparison with NetLogo Model](https://www.notion.so/Frogger-in-MARS-24c1bf2750c680118ddaf4f2371b1429?pvs=21)
-6. [Conclusion](https://www.notion.so/Frogger-in-MARS-24c1bf2750c680118ddaf4f2371b1429?pvs=21)
+1. [Project Overview](#1-project-overview)
+2. [Model Design](#3-model-design)
+3. [Implementation Details](#4-implementation-details)
+4. [Getting Started](#2-getting-started)
+5. [Comparison with NetLogo Model](#5-comparison-with-netlogo-model)
+6. [Conclusion](#6-conclusion)
 
 ---
 
@@ -58,9 +58,64 @@ The main objectives in porting the model to MARS were:
 3. Implement a visual interface for real-time observation of the simulation.
 4. Perform parameter variation to validate similarity between the two models.
 
+
+## **2. Getting Started**
+
+### 4.1 Requirements
+
+- **.NET 8.0 SDK** - for running the MARS simulation.
+- **MARS Framework** - installed as per MARS documentation.
+- **Git** - to clone the repository.
+- **No Godot installation required** — the visualization frontend is included as a packaged executable in `Visualization\Frogger.exe`
+
+### 4.2 Installation
+
+1. **Clone the repository**
+
+    ```bash
+    git clone https://github.com/Yamam-al/frogger_mars
+    cd frogger_mars
+    ```
+
+2. **Install dependencies**
+
+   Ensure the MARS framework is available in your development environment.
+
+   If using Rider or Visual Studio, restore NuGet packages.
+
+
+### 4.3 Running the Simulation
+
+1. **Start the MARS simulation**
+    - From the project root, run:
+
+        ```bash
+        dotnet run
+        ```
+
+    - MARS will initialize agents and start the WebSocket server on `ws://127.0.0.1:8181`.
+2. **Start the Visualization**
+    - Run the included executable:
+
+        ```
+        Visualization\Frogger.exe
+        ```
+
+    - This launches the visualization frontend and connects to the running MARS simulation.
+3. **Start the game**
+    - Once both are running, click **Start** in the visualization window to begin the simulation.
+
+### 2.2 Controls (Visualization Frontend)
+
+- **Reset** — Reset lives, time, and level to initial values.
+- **Start** — Starts the game (turns to **Pause** / **Resume** depending on state of the game).
+- **Time:** — Time (in seconds) per life.
+- **Lives:** — Number of lives for the frog.
+- **Level:** — Which level to load first.
+
 ---
 
-## **2. Model Design**
+## **3. Model Design**
 
 ### 2.1 Agents
 
@@ -114,38 +169,26 @@ They are set either via **`config.json`** before the simulation starts or via th
 ### **Simulation & Timing**
 
 | Parameter | Source | Default | Description |
-| --- | --- | --- | --- |
-| `VisualizationTimeout` | `config.json` → MyGridLayer | 180 | Delay (in milliseconds) between checks for an ACK from the Godot client in `PostTick()`. Lower values check more frequently (lower latency), higher values check less often. |
-| `TicksPerSecondDivisor` | `config.json` → MyGridLayer | 5 | Number of simulation ticks that equal one in-game second. |
-| `steps` | `config.json` | 10000 | Total number of simulation ticks before stopping automatically. |
+| --- | --- | --- | --- | | `VisualizationTimeout` | `config.json` → MyGridLayer | 180 | Delay (in milliseconds) between checks for an ACK from the Godot client in `PostTick()`. Lower values check more frequently (lower latency), higher values check less often. | | `TicksPerSecondDivisor` | `config.json` → MyGridLayer | 5 | Number of simulation ticks that equal one in-game second. | | `steps` | `config.json` | 10000 | Total number of simulation ticks before stopping automatically. |
 
 ### **Levels & Layout**
 
 | Parameter | Source | Default | Description |
-| --- | --- | --- | --- |
-| `LevelFilesCsv` | `config.json` → MyGridLayer | 5 CSV files listed | Semicolon-separated list of grid CSV files (levels). |
-| Agent counts | `config.json` | Frog (1), Cars (22), Trucks (9), Logs (21), Turtles (17), Pads (5). | Number of agents of each type spawned at init |
+| --- | --- | --- | --- | | `LevelFilesCsv` | `config.json` → MyGridLayer | 5 CSV files listed | Semicolon-separated list of grid CSV files (levels). | | Agent counts | `config.json` | Frog (1), Cars (22), Trucks (9), Logs (21), Turtles (17), Pads (5). | Number of agents of each type spawned at init |
 
 ### **Player Settings (UI adjustable)**
 
 | Parameter | Source | Default | Description |
-| --- | --- | --- | --- |
-| `StartLives` | `DataVisualizationServer` UI | 5 | Number of lives the frog starts with. |
-| `StartTimeSeconds` | `DataVisualizationServer` UI | 60 | Countdown time per life before automatic death. |
-| `StartLevel` | `DataVisualizationServer` UI | 1 | Level index to start from (1-based). |
+| --- | --- | --- | --- | | `StartLives` | `DataVisualizationServer` UI | 5 | Number of lives the frog starts with. | | `StartTimeSeconds` | `DataVisualizationServer` UI | 60 | Countdown time per life before automatic death. | | `StartLevel` | `DataVisualizationServer` UI | 1 | Level index to start from (1-based). |
 
 ### **Agent Movement (fixed in code)**
 
 | Agent | Speed Behavior |
-| --- | --- |
-| **CarAgent** | Moves **1 tile every tick** in heading direction. Wraps at edges. |
-| **TruckAgent** | Moves **1 tile every second tick** in heading direction. Wraps at edges. |
-| **LogAgent** | Moves **1 tile every second tick** to the right. Wraps at edges. |
-| **TurtleAgent** | Moves **1 tile every second tick** to the left. Can be hidden (submerged |
+| --- | --- | | **CarAgent** | Moves **1 tile every tick** in heading direction. Wraps at edges. | | **TruckAgent** | Moves **1 tile every second tick** in heading direction. Wraps at edges. | | **LogAgent** | Moves **1 tile every second tick** to the right. Wraps at edges. | | **TurtleAgent** | Moves **1 tile every second tick** to the left. Can be hidden (submerged |
 
 ---
 
-## **3. Implementation Details**
+## **4. Implementation Details**
 
 ### 3.1 Technology Stack
 
@@ -192,95 +235,40 @@ The MARS implementation follows a modular agent-based structure:
 ### 3.4 Key Implementation Differences from NetLogo
 
 - **Time base & pacing**
-    
-    NetLogo advances agents with `every 0.1` and per-agent `speed/time` counters; my MARS version maps ticks to seconds via `TicksPerSecondDivisor` and decrements time on that cadence. Each tick is also gated by a WebSocket ACK, with a polling delay controlled by `VisualizationTimeout`.
-    
+
+  NetLogo advances agents with `every 0.1` and per-agent `speed/time` counters; my MARS version maps ticks to seconds via `TicksPerSecondDivisor` and decrements time on that cadence. Each tick is also gated by a WebSocket ACK, with a polling delay controlled by `VisualizationTimeout`.
+
 - **Frontend & control path**
-    
-    NetLogo uses its built-in UI; my simulation is headless and communicates with a Godot client via a C# WebSocket bridge (`DataVisualizationServer`) supporting `start/pause/resume/restart` and live setters for `StartLives`, `StartTimeSeconds`, and `StartLevel`.
-    
+
+  NetLogo uses its built-in UI; my simulation is headless and communicates with a Godot client via a C# WebSocket bridge (`DataVisualizationServer`) supporting `start/pause/resume/restart` and live setters for `StartLives`, `StartTimeSeconds`, and `StartLevel`.
+
 - **Level handling**
-    
-    NetLogo advances levels internally; in MARS I load grid layouts from CSV (`LevelFilesCsv`), apply the chosen `StartLevel` at (re)start, and end the game when all pads are filled (no auto-advance).
-    
+
+  NetLogo advances levels internally; in MARS I load grid layouts from CSV (`LevelFilesCsv`), apply the chosen `StartLevel` at (re)start, and end the game when all pads are filled (no auto-advance).
+
 - **Agent movement rates (fixed vs. parametric)**
-    
-    NetLogo vehicles/platforms use a `speed` variable with timers. In MARS the movement cadence is fixed in code: cars move every tick, trucks every second tick, logs and turtles every 2 ticks (right/left, respectively).
-    
+
+  NetLogo vehicles/platforms use a `speed` variable with timers. In MARS the movement cadence is fixed in code: cars move every tick, trucks every second tick, logs and turtles every 2 ticks (right/left, respectively).
+
 - **Turtle diving**
-    
-    NetLogo includes random dive behavior; in MARS I expose a `Hidden` flag on turtles but do not yet implement a dive schedule/randomizer—hidden status only matters if set.
-    
+
+  NetLogo includes random dive behavior; in MARS I expose a `Hidden` flag on turtles but do not yet implement a dive schedule/randomizer—hidden status only matters if set.
+
 - **Platform carrying logic**
-    
-    NetLogo moves the frog immediately in the same update that moves logs/turtles. In MARS, time is discrete and paced by `TicksPerSecondDivisor` plus a WebSocket ACK from the client, so I avoid same-tick moves to prevent race conditions. Instead, I snapshot platform positions at T−1, compute per-row motion (wrap-aware, clamped to ±1), and carry the frog only if it was on a platform in that row at T−1. This ensures deterministic, one-move-per-tick behavior even with network pacing. In rare edge cases this can cause slight “push-back” of the frog, but it proved the most stable and consistent approach for my setup.
-    
+
+  NetLogo moves the frog immediately in the same update that moves logs/turtles. In MARS, time is discrete and paced by `TicksPerSecondDivisor` plus a WebSocket ACK from the client, so I avoid same-tick moves to prevent race conditions. Instead, I snapshot platform positions at T−1, compute per-row motion (wrap-aware, clamped to ±1), and carry the frog only if it was on a platform in that row at T−1. This ensures deterministic, one-move-per-tick behavior even with network pacing. In rare edge cases this can cause slight “push-back” of the frog, but it proved the most stable and consistent approach for my setup.
+
 - **Water detection**
-    
-    NetLogo derives water from patch colors; MARS treats rows `Y ∈ [0..6]` as water and checks absence of pads/logs/visible turtles on that tile.
-    
+
+  NetLogo derives water from patch colors; MARS treats rows `Y ∈ [0..6]` as water and checks absence of pads/logs/visible turtles on that tile.
+
 - **Frog population**
-    
-    The NetLogo model spawns multiple “sensor frogs” (`frogs2..9`). The MARS model uses a single active `FrogAgent`.
-    
+
+  The NetLogo model spawns multiple “sensor frogs” (`frogs2..9`). The MARS model uses a single active `FrogAgent`.
+
 
 ---
 
-## **4. Simulation & Usage**
-
-### 4.1 Requirements
-
-- **.NET 8.0 SDK** - for running the MARS simulation.
-- **MARS Framework** - installed as per MARS documentation.
-- **Git** - to clone the repository.
-- **No Godot installation required** — the visualization frontend is included as a packaged executable in `Visualization\Frogger.exe`
-
-### 4.2 Installation
-
-1. **Clone the repository**
-    
-    ```bash
-    git clone <repo-url>
-    cd frogger_mars
-    ```
-    
-2. **Install dependencies**
-    
-    Ensure the MARS framework is available in your development environment.
-    
-    If using Rider or Visual Studio, restore NuGet packages.
-    
-
-### 4.3 Running the Simulation
-
-1. **Start the MARS simulation**
-    - From the project root, run:
-        
-        ```bash
-        dotnet run
-        ```
-        
-    - MARS will initialize agents and start the WebSocket server on `ws://127.0.0.1:8181`.
-2. **Start the Visualization**
-    - Run the included executable:
-        
-        ```
-        Visualization\Frogger.exe
-        ```
-        
-    - This launches the visualization frontend and connects to the running MARS simulation.
-3. **Start the game**
-    - Once both are running, click **Start** in the visualization window to begin the simulation.
-
-### 4.4 Controls (Visualization Frontend)
-
-- **Arrow keys** — Move the frog up/down/left/right (one tile per tick).
-- **Pause / Resume** — Temporarily halt or continue the simulation.
-- **Restart** — Reset lives, time, and level to initial values.
-- **UI Parameters** (adjust before starting):
-    - **Start Lives** — Number of lives for the frog.
-    - **Start Time** — Time (in seconds) per life.
-    - **Start Level** — Which level to load first.
 
 ---
 
@@ -351,14 +339,9 @@ These differences meant I focused on **pattern consistency** and outcome similar
 ### **Stage 1 – Stationary baseline & parameter variation**
 
 | StartTimeSeconds | StartLevel | Model | Time Until Timeout (s) | Car/Truck Pattern Match? | Log/Turtle Pattern Match? | Correct Level Layout? | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 30 | 1 | MARS | 140 s 
+| --- | --- | --- | --- | --- | --- | --- | --- | | 30 | 1 | MARS | 140 s
 = 28 s per live
-→ 1 Game sec = 0,93 s | Yes | Yes | Yes | Trucks are slightly shifted due to differences in size. |
-|  |  | NetLogo | 31 s per live
-→ 1 Game sec = 1,03 s | Yes | Yes | Yes | After the first timeout, a pop-up appears indicating that the first frog has died. |
-| 60 | 3 | MARS | 56 s per live | Yes | Yes | Yes | - |
-|  |  | NetLogo | 62 s per live | Yes | Yes | Yes | Trucks in NetLogo move slightly slower than in the MARS simulation. |
+→ 1 Game sec = 0,93 s | Yes | Yes | Yes | Trucks are slightly shifted due to differences in size. | |  |  | NetLogo | 31 s per live → 1 Game sec = 1,03 s | Yes | Yes | Yes | After the first timeout, a pop-up appears indicating that the first frog has died. | | 60 | 3 | MARS | 56 s per live | Yes | Yes | Yes | - | |  |  | NetLogo | 62 s per live | Yes | Yes | Yes | Trucks in NetLogo move slightly slower than in the MARS simulation. |
 
 ![image.png](image.png)
 
@@ -367,26 +350,14 @@ These differences meant I focused on **pattern consistency** and outcome similar
 ### **Stage 2 – Controlled movement & parameter variation**
 
 | StartLives | StartLevel | Model | Lives Decrement  and start lives parameter Work? | Game Over at 0 Lives? | Collision Works? | Drowning Works? | Log/Turtle Carry Works? | Pad Completion Works? | Correct Level Layout? | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 3 | 1 | MARS | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | In some edge cases, the frog gets pushed back while being carried. |
-|  |  | NetLogo | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | In some edge cases, the frog gets pushed forward while being carried, but this happens less often than in MARS. |
-| 5 | 2 | MARS | Yes | Yes | Yes | Yes | Yes* | Yes | Yes |  |
-|  |  | NetLogo | Yes | Yes | Yes | Yes | Yes* | Yes | Yes |  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | | 3 | 1 | MARS | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | In some edge cases, the frog gets pushed back while being carried. | |  |  | NetLogo | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | In some edge cases, the frog gets pushed forward while being carried, but this happens less often than in MARS. | | 5 | 2 | MARS | Yes | Yes | Yes | Yes | Yes* | Yes | Yes |  | |  |  | NetLogo | Yes | Yes | Yes | Yes | Yes* | Yes | Yes |  |
 
 ---
 
 ### **Stage 3 – Free play**
 
 | Metric | Model | Value | Notes |
-| --- | --- | --- | --- |
-| Average Jumps per Life | MARS | 15 | - |
-|  | NetLogo | 20 | - |
-| Average Lives Lost per Level | MARS | 4 | - |
-|  | NetLogo | 3 | - |
-| Time to Complete Level 1 | MARS | 250 s | - |
-|  | NetLogo | 215 s | - |
-| Time to Complete or lose Level 5 | MARS | 45 s (Game over) | 5 lives |
-|  | NetLogo | 52 s (Game over) | 5 lives |
+| --- | --- | --- | --- | | Average Jumps per Life | MARS | 15 | - | |  | NetLogo | 20 | - | | Average Lives Lost per Level | MARS | 4 | - | |  | NetLogo | 3 | - | | Time to Complete Level 1 | MARS | 250 s | - | |  | NetLogo | 215 s | - | | Time to Complete or lose Level 5 | MARS | 45 s (Game over) | 5 lives | |  | NetLogo | 52 s (Game over) | 5 lives |
 
 ---
 
