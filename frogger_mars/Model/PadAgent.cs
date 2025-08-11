@@ -26,4 +26,18 @@ public class PadAgent : AbstractFroggerAgent, IAgent<MyGridLayer>
 
     /// <summary>No per-tick behavior for pads.</summary>
     public void Tick() { }
+
+    /// <summary>Marks this pad as occupied by the given frog.</summary>
+    public void SetOccupied(int frogAgentId)
+    {
+        Occupied = true;
+        OccupiedByFrogId = frogAgentId;
+    }
+
+    /// <summary>Clears the occupied state so the pad becomes free again (used on reset).</summary>
+    public void Clear()
+    {
+        Occupied = false;
+        OccupiedByFrogId = null;
+    }
 }

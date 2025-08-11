@@ -152,9 +152,7 @@ namespace frogger_mars.Model
             return layout;
         }
 
-        /// <summary>
-        /// Loads all configured level layouts into memory.
-        /// </summary>
+        /// <summary>Loads all configured level layouts into memory.</summary>
         private void LoadLevelLayouts()
         {
             _levelLayouts.Clear();
@@ -173,6 +171,7 @@ namespace frogger_mars.Model
         /// <summary>
         /// Applies the given level layout to all agents (positions, headings) and resets snapshots.
         /// Agents in excess are parked off-grid to keep ids stable.
+        /// Pads are cleared on apply.
         /// </summary>
         private void ApplyLevel(int levelIndex)
         {
@@ -249,23 +248,21 @@ namespace frogger_mars.Model
 
             for (int i = tri; i < Turtles.Count; i++) Turtles[i].Position = Position.CreatePosition(-1000, -1000);
 
-            // Pads
+            // Pads (ensure free)
             int pi = 0;
             foreach (var p in L.Pads)
             {
                 if (pi >= Pads.Count) break;
                 var pd = Pads[pi];
                 pd.Position = p;
-                pd.Occupied = false;
-                pd.OccupiedByFrogId = null;
+                pd.Clear();
                 pi++;
             }
 
             for (int i = pi; i < Pads.Count; i++)
             {
                 Pads[i].Position = Position.CreatePosition(-1000, -1000);
-                Pads[i].Occupied = false;
-                Pads[i].OccupiedByFrogId = null;
+                Pads[i].Clear();
             }
 
             // Snapshots / lane maps
@@ -286,9 +283,6 @@ namespace frogger_mars.Model
 
         // ---------- Init / Loop ----------
 
-        /// <summary>
-        /// Creates agents, loads level layouts, applies initial level, binds the visualization server and starts it.
-        /// </summary>
         public override bool InitLayer(LayerInitData layerInitData, RegisterAgent registerAgentHandle,
             UnregisterAgent unregisterAgentHandle)
         {
@@ -428,8 +422,7 @@ namespace frogger_mars.Model
             {
                 if (!pad.Occupied)
                 {
-                    pad.Occupied = true;
-                    pad.OccupiedByFrogId = ActiveFrog.AgentId;
+                    pad.SetOccupied(ActiveFrog.AgentId);
                     ResetActiveFrogToStart();
                     if (Pads.All(pd => pd.Occupied))
                     {
@@ -517,9 +510,7 @@ namespace frogger_mars.Model
             ResetTimer();
         }
 
-        /// <summary>
-        /// Returns true if a position is in the water rows and not on a platform/pad tile.
-        /// </summary>
+        /// <summary>Returns true if a position is in the water rows and not on a platform/pad tile.</summary>
         private bool IsWaterTile(Position pos)
         {
             // Example: rows 0..6 are water
@@ -534,9 +525,7 @@ namespace frogger_mars.Model
             return false;
         }
 
-        /// <summary>
-        /// Returns true if a car or truck occupies the same tile.
-        /// </summary>
+        /// <summary>Returns true if a car or truck occupies the same tile.</summary>
         private bool CollidesWithVehicle(Position p)
         {
             return Cars.Any(c => c.Position.Equals(p)) ||
@@ -545,9 +534,13 @@ namespace frogger_mars.Model
 
         /// <summary>
         /// Resets lives, timer, pads and applies the selected start level as chosen by the client.
+        /// Also emits a minimal "reset" event to let the GUI purge pad-dummy frogs immediately.
         /// </summary>
         private void ResetGameState()
         {
+            // Let GUI clear pad frogs before new snapshot to avoid ghost visuals.
+            _dataVisualizationServer.SendReset();
+
             ApplyLevel(Math.Max(1, _dataVisualizationServer.StartLevel));
 
             _startTimeSeconds = _dataVisualizationServer.StartTimeSeconds;
@@ -558,10 +551,7 @@ namespace frogger_mars.Model
             _gameOver = false;
 
             foreach (var pd in Pads)
-            {
-                pd.Occupied = false;
-                pd.OccupiedByFrogId = null;
-            }
+                pd.Clear();
 
             _dataVisualizationServer.ClearPendingRemovals();
             _dataVisualizationServer.SetGameOver(false);
@@ -702,9 +692,7 @@ namespace frogger_mars.Model
             }
         }
 
-        /// <summary>
-        /// Returns the shortest horizontal delta on a torus (wrap-aware).
-        /// </summary>
+        /// <summary>Returns the shortest horizontal delta on a torus (wrap-aware).</summary>
         private static int TorusDelta(int prevX, int curX, int width)
         {
             int dx = curX - prevX;

@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
@@ -308,6 +308,19 @@ public class DataVisualizationServer
     }
 
     /// <summary>
+    /// Sends a minimal reset signal to the client so it can purge pad-frog visuals
+    /// before the next full snapshot arrives.
+    /// </summary>
+    public void SendReset()
+    {
+        var resetPayload = new { type = "reset", tick = CurrentTick };
+        var msg = JsonSerializer.Serialize(resetPayload);
+        Console.WriteLine($"[WS] Sending reset: {msg}");
+        _client?.Send(msg);
+        // Note: we do not overwrite _lastMessage on purpose (out-of-band event).
+    }
+
+    /// <summary>
     /// Serializes the current agent state and pushes it to the client.
     /// Also caches the payload so we can re-send it when the ACK is unexpected.
     /// </summary>
@@ -344,7 +357,7 @@ public class DataVisualizationServer
 
         int[] removeIds;
         lock (_removeIds){ removeIds = _removeIds.ToArray(); _removeIds.Clear(); }
-        
+
         var payload = new
         {
             expectingTick = CurrentTick + 1,

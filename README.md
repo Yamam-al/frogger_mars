@@ -1,3 +1,3 @@
-# SupermanMind – Q-Learning-Agent für LaserTagBox
+# Frogger Simulation
 
 ## TODO
