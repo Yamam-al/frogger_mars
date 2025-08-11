@@ -21,9 +21,9 @@ The project was developed as part of the **Final Examination** in the elective m
 ## **Table of Contents**
 
 1. [Project Overview](#1-project-overview)
-2. [Model Design](#3-model-design)
-3. [Implementation Details](#4-implementation-details)
-4. [Getting Started](#2-getting-started)
+2. [Getting Started](#2-getting-started)
+3. [Model Design](#3-model-design)
+4. [Implementation Details](#4-implementation-details)
 5. [Comparison with NetLogo Model](#5-comparison-with-netlogo-model)
 6. [Conclusion](#6-conclusion)
 
@@ -166,25 +166,37 @@ The following parameters are configurable in my MARS Frogger simulation.
 
 They are set either via **`config.json`** before the simulation starts or via the **Godot frontend UI** during runtime.
 
-### **Simulation & Timing**
+#### Simulation & Timing
 
 | Parameter | Source | Default | Description |
-| --- | --- | --- | --- | | `VisualizationTimeout` | `config.json` → MyGridLayer | 180 | Delay (in milliseconds) between checks for an ACK from the Godot client in `PostTick()`. Lower values check more frequently (lower latency), higher values check less often. | | `TicksPerSecondDivisor` | `config.json` → MyGridLayer | 5 | Number of simulation ticks that equal one in-game second. | | `steps` | `config.json` | 10000 | Total number of simulation ticks before stopping automatically. |
+|---|---|---|---|
+| `VisualizationTimeout` | `config.json` → MyGridLayer | 180 | Delay (in milliseconds) between checks for an ACK from the Godot client in `PostTick()`. Lower values check more frequently (lower latency), higher values check less often. |
+| `TicksPerSecondDivisor` | `config.json` → MyGridLayer | 5 | Number of simulation ticks that equal one in-game second. |
+| `steps` | `config.json` | 10000 | Total number of simulation ticks before stopping automatically. |
 
-### **Levels & Layout**
-
-| Parameter | Source | Default | Description |
-| --- | --- | --- | --- | | `LevelFilesCsv` | `config.json` → MyGridLayer | 5 CSV files listed | Semicolon-separated list of grid CSV files (levels). | | Agent counts | `config.json` | Frog (1), Cars (22), Trucks (9), Logs (21), Turtles (17), Pads (5). | Number of agents of each type spawned at init |
-
-### **Player Settings (UI adjustable)**
+#### Levels & Layout
 
 | Parameter | Source | Default | Description |
-| --- | --- | --- | --- | | `StartLives` | `DataVisualizationServer` UI | 5 | Number of lives the frog starts with. | | `StartTimeSeconds` | `DataVisualizationServer` UI | 60 | Countdown time per life before automatic death. | | `StartLevel` | `DataVisualizationServer` UI | 1 | Level index to start from (1-based). |
+|---|---|---|---|
+| `LevelFilesCsv` | `config.json` → MyGridLayer | 5 CSV files listed | Semicolon-separated list of grid CSV files (levels). |
+| Agent counts | `config.json` | Frog (1), Cars (22), Trucks (9), Logs (21), Turtles (17), Pads (5) | Number of agents of each type spawned at init. |
 
-### **Agent Movement (fixed in code)**
+#### Player Settings (UI adjustable)
 
-| Agent | Speed Behavior |
-| --- | --- | | **CarAgent** | Moves **1 tile every tick** in heading direction. Wraps at edges. | | **TruckAgent** | Moves **1 tile every second tick** in heading direction. Wraps at edges. | | **LogAgent** | Moves **1 tile every second tick** to the right. Wraps at edges. | | **TurtleAgent** | Moves **1 tile every second tick** to the left. Can be hidden (submerged |
+| Parameter | Source | Default | Description |
+|---|---|---|---|
+| `StartLives` | `DataVisualizationServer` UI | 5 | Number of lives the frog starts with. |
+| `StartTimeSeconds` | `DataVisualizationServer` UI | 60 | Countdown time per life before automatic death. |
+| `StartLevel` | `DataVisualizationServer` UI | 1 | Level index to start from (1-based). |
+
+#### Agent Movement (fixed in code)
+
+| Agent | Speed behavior |
+|---|---|
+| **CarAgent** | Moves 1 tile every tick in heading direction; wraps at edges. |
+| **TruckAgent** | Moves 1 tile every second tick in heading direction; wraps at edges. |
+| **LogAgent** | Moves 1 tile every second tick to the right; wraps at edges. |
+| **TurtleAgent** | Moves 1 tile every second tick to the left; can be hidden (submerged). |
 
 ---
 
@@ -269,9 +281,6 @@ The MARS implementation follows a modular agent-based structure:
 
 ---
 
-
----
-
 ## **5. Comparison with NetLogo Model**
 
 ### **5.1 Comparison Methodology**
@@ -339,9 +348,11 @@ These differences meant I focused on **pattern consistency** and outcome similar
 ### **Stage 1 – Stationary baseline & parameter variation**
 
 | StartTimeSeconds | StartLevel | Model | Time Until Timeout (s) | Car/Truck Pattern Match? | Log/Turtle Pattern Match? | Correct Level Layout? | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- | | 30 | 1 | MARS | 140 s
-= 28 s per live
-→ 1 Game sec = 0,93 s | Yes | Yes | Yes | Trucks are slightly shifted due to differences in size. | |  |  | NetLogo | 31 s per live → 1 Game sec = 1,03 s | Yes | Yes | Yes | After the first timeout, a pop-up appears indicating that the first frog has died. | | 60 | 3 | MARS | 56 s per live | Yes | Yes | Yes | - | |  |  | NetLogo | 62 s per live | Yes | Yes | Yes | Trucks in NetLogo move slightly slower than in the MARS simulation. |
+|---|---|---|---|---|---|---|---|
+| 30 | 1 | MARS | 140 s (= 28 s per life; 1 game sec ≈ 0,93 s) | Yes | Yes | Yes | Trucks are slightly shifted due to differences in size. |
+| 30 | 1 | NetLogo | 31 s per life (1 game sec ≈ 1,03 s) | Yes | Yes | Yes | After the first timeout, a pop-up appears indicating that the first frog has died. |
+| 60 | 3 | MARS | 56 s per life | Yes | Yes | Yes | – |
+| 60 | 3 | NetLogo | 62 s per life | Yes | Yes | Yes | Trucks in NetLogo move slightly slower than in the MARS simulation. |
 
 ![image.png](image.png)
 
@@ -349,15 +360,27 @@ These differences meant I focused on **pattern consistency** and outcome similar
 
 ### **Stage 2 – Controlled movement & parameter variation**
 
-| StartLives | StartLevel | Model | Lives Decrement  and start lives parameter Work? | Game Over at 0 Lives? | Collision Works? | Drowning Works? | Log/Turtle Carry Works? | Pad Completion Works? | Correct Level Layout? | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | | 3 | 1 | MARS | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | In some edge cases, the frog gets pushed back while being carried. | |  |  | NetLogo | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | In some edge cases, the frog gets pushed forward while being carried, but this happens less often than in MARS. | | 5 | 2 | MARS | Yes | Yes | Yes | Yes | Yes* | Yes | Yes |  | |  |  | NetLogo | Yes | Yes | Yes | Yes | Yes* | Yes | Yes |  |
+| StartLives | StartLevel | Model | StartLives Applies? | Game Over at 0 Lives? | Collision Works? | Drowning Works? | Log/Turtle Carry Works? | Pad Completion Works? | Correct Level Layout? | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3 | 1 | MARS | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | In some edge cases, the frog gets pushed back while being carried. |
+| 3 | 1 | NetLogo | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | In some edge cases, the frog gets pushed forward while being carried, but this happens less often than in MARS. |
+| 5 | 2 | MARS | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | – |
+| 5 | 2 | NetLogo | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | – |
 
 ---
 
 ### **Stage 3 – Free play**
 
 | Metric | Model | Value | Notes |
-| --- | --- | --- | --- | | Average Jumps per Life | MARS | 15 | - | |  | NetLogo | 20 | - | | Average Lives Lost per Level | MARS | 4 | - | |  | NetLogo | 3 | - | | Time to Complete Level 1 | MARS | 250 s | - | |  | NetLogo | 215 s | - | | Time to Complete or lose Level 5 | MARS | 45 s (Game over) | 5 lives | |  | NetLogo | 52 s (Game over) | 5 lives |
+|---|---|---|---|
+| Average Jumps per Life | MARS | 15 | – |
+| Average Jumps per Life | NetLogo | 20 | – |
+| Average Lives Lost per Level | MARS | 4 | – |
+| Average Lives Lost per Level | NetLogo | 3 | – |
+| Time to Complete Level 1 | MARS | 250 s | – |
+| Time to Complete Level 1 | NetLogo | 215 s | – |
+| Time to Complete or Lose Level 5 | MARS | 45 s (Game over) | 5 lives |
+| Time to Complete or Lose Level 5 | NetLogo | 52 s (Game over) | 5 lives |
 
 ---
 
