@@ -6,6 +6,8 @@
 
 *Date: August 2025*
 
+*Repo: **[Github](https://github.com/Yamam-al/frogger_mars)**
+
 This project implements the NetLogo model **“[Frogger](https://ccl.northwestern.edu/NetLogo/models/Frogger)”** in the **MARS** (Multi-Agent Research and Simulation) framework.
 
 The goal is to replicate the game logic and agent interactions of the original model as closely as possible and to verify, through simulation runs and parameter variation, that both models produce comparable results under the same conditions.
@@ -26,6 +28,7 @@ The project was developed as part of the **Final Examination** in the elective m
 4. [Implementation Details](#4-implementation-details)
 5. [Comparison with NetLogo Model](#5-comparison-with-netlogo-model)
 6. [Conclusion](#6-conclusion)
+7. [Credits](#7-credits)
 
 ---
 
@@ -61,14 +64,14 @@ The main objectives in porting the model to MARS were:
 
 ## **2. Getting Started**
 
-### 4.1 Requirements
+### 2.1 Requirements
 
 - **.NET 8.0 SDK** - for running the MARS simulation.
 - **MARS Framework** - installed as per MARS documentation.
 - **Git** - to clone the repository.
 - **No Godot installation required** — the visualization frontend is included as a packaged executable in `Visualization\Frogger.exe`
 
-### 4.2 Installation
+### 2.2 Installation
 
 1. **Clone the repository**
 
@@ -84,7 +87,7 @@ The main objectives in porting the model to MARS were:
    If using Rider or Visual Studio, restore NuGet packages.
 
 
-### 4.3 Running the Simulation
+### 2.3 Running the Simulation
 
 1. **Start the MARS simulation**
     - From the project root, run:
@@ -105,7 +108,7 @@ The main objectives in porting the model to MARS were:
 3. **Start the game**
     - Once both are running, click **Start** in the visualization window to begin the simulation.
 
-### 2.2 Controls (Visualization Frontend)
+### 2.4 Controls (Visualization Frontend)
 
 - **Reset** — Reset lives, time, and level to initial values.
 - **Start** — Starts the game (turns to **Pause** / **Resume** depending on state of the game).
@@ -117,7 +120,7 @@ The main objectives in porting the model to MARS were:
 
 ## **3. Model Design**
 
-### 2.1 Agents
+### 3.1 Agents
 
 The model consists of multiple agent types, each with distinct roles and movement patterns:
 
@@ -143,7 +146,7 @@ The model consists of multiple agent types, each with distinct roles and movemen
     - The frog must occupy all pads to complete the level.
     - Each pad can only be occupied once per level.
 
-### 2.2 Environment & Grid Layout
+### 3.2 Environment & Grid Layout
 
 - **Grid-based world** with discrete tiles.
 - Divided into multiple horizontal lanes:
@@ -153,14 +156,14 @@ The model consists of multiple agent types, each with distinct roles and movemen
     4. **Goal zone** with pads.
 - Movement is turn-based, with each tick updating all agents’ positions.
 
-### 2.3 Rules & Interactions
+### 3.3 Rules & Interactions
 
 - **Collisions with vehicles** → Frog loses a life.
 - **Falling into water** → Frog loses a life unless standing on a log/turtle.
 - **Reaching a pad** → Frog is placed back at start for the next attempt, pad is marked as filled.
 - **Game over** occurs when all lives are lost or when all pads are filled (win condition).
 
-### **2.4 Parameters (MARS Implementation)**
+### **3.4 Parameters (MARS Implementation)**
 
 The following parameters are configurable in my MARS Frogger simulation.
 
@@ -202,14 +205,14 @@ They are set either via **`config.json`** before the simulation starts or via th
 
 ## **4. Implementation Details**
 
-### 3.1 Technology Stack
+### 4.1 Technology Stack
 
 - **MARS Framework**: Multi-Agent Research and Simulation framework used to implement the model in C#.
 - **.NET**: Core runtime for running the simulation logic.
 - **Godot Engine**: Used as a visualization frontend, connected via WebSocket.
 - **NetLogo**: Original reference implementation for comparison and validation.
 
-### 3.2 Code Structure
+### 4.2 Code Structure
 
 The MARS implementation follows a modular agent-based structure:
 
@@ -231,7 +234,7 @@ The MARS implementation follows a modular agent-based structure:
         - Receives input commands (`up`, `down`, `left`, `right`).
         - Handles control commands (`start`, `pause`, `resume`, `restart`, parameter changes).
 
-### 3.3 Data & Configuration
+### 4.3 Data & Configuration
 
 - **`config.json`**
     - Defines global simulation settings (number of steps, output format).
@@ -244,7 +247,7 @@ The MARS implementation follows a modular agent-based structure:
 - **Runtime Parameters (via Godot UI)**
     - `StartLives`, `StartTimeSeconds`, and `StartLevel` can be set interactively before a run.
 
-### 3.4 Key Implementation Differences from NetLogo
+### 4.4 Key Implementation Differences from NetLogo
 
 - **Time base & pacing**
 
@@ -287,7 +290,7 @@ The MARS implementation follows a modular agent-based structure:
 
 To verify that my MARS implementation behaves similarly to the original NetLogo *Frogger* model, I performed side-by-side simulation runs under matched conditions.
 
-### **Stages of Comparison**
+### **5.2 Stages of Comparison**
 
 1. **Stage 1 – Stationary baseline & parameter variation**
     - I kept the frog at its start position with no input.
@@ -320,13 +323,13 @@ To verify that my MARS implementation behaves similarly to the original NetLogo 
 
 ---
 
-### **Test Conditions**
+### **5.3 Test Conditions**
 
 - **Same level layouts**: All levels from the NetLogo model were replicated in the MARS implementation.
 - **Same initial conditions**: Starting lives, starting time, and level selection were aligned (`StartLives`, `StartTimeSeconds`, `StartLevel`).
 - **Same obstacle and platform counts**: Agent counts for cars, trucks, logs, turtles, and pads were matched between the two models.
 
-### **Metrics Collected**
+### **5.4 Metrics Collected**
 
 - Time until the level timer expired in stationary mode.
 - Movement patterns of vehicles and platforms.
@@ -343,9 +346,9 @@ These differences meant I focused on **pattern consistency** and outcome similar
 
 ---
 
-## **5.2 Results**
+### **5.5 Results**
 
-### **Stage 1 – Stationary baseline & parameter variation**
+#### **Stage 1 – Stationary baseline & parameter variation**
 
 | StartTimeSeconds | StartLevel | Model | Time Until Timeout (s) | Car/Truck Pattern Match? | Log/Turtle Pattern Match? | Correct Level Layout? | Notes |
 |---|---|---|---|---|---|---|---|
@@ -358,7 +361,7 @@ These differences meant I focused on **pattern consistency** and outcome similar
 
 ---
 
-### **Stage 2 – Controlled movement & parameter variation**
+#### **Stage 2 – Controlled movement & parameter variation**
 
 | StartLives | StartLevel | Model | StartLives Applies? | Game Over at 0 Lives? | Collision Works? | Drowning Works? | Log/Turtle Carry Works? | Pad Completion Works? | Correct Level Layout? | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -369,7 +372,7 @@ These differences meant I focused on **pattern consistency** and outcome similar
 
 ---
 
-### **Stage 3 – Free play**
+#### **Stage 3 – Free play**
 
 | Metric | Model | Value | Notes |
 |---|---|---|---|
@@ -384,7 +387,7 @@ These differences meant I focused on **pattern consistency** and outcome similar
 
 ---
 
-## **5.3 Observations**
+### **5.6 Observations**
 
 - **Overall similarity**:
     - Hazard movement patterns for cars, trucks, logs, and turtles are consistent between the two models.
@@ -429,7 +432,7 @@ These deviations have **minimal impact on the overall gameplay experience**. In 
 
 Overall, the MARS version successfully replicates the essential behaviors of the NetLogo *Frogger* model while adapting them to the tick-based architecture of the MARS framework.
 
-## Credits
+## **7. Credits**
 
 - Original NetLogo model by Mochamad Agung Tarecha (UIN Maulana Malik Ibrahim Malang, Indonesia).
 - similar MARS implementation by the MARS Group HAW especially the [LaserTag](https://github.com/MARS-Group-HAW/model-mars-laser-tag-game/tree/master) implementation
